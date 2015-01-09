@@ -19,7 +19,24 @@ const (
 	iso8601Layout = "20060102T000000Z"
 )
 
-func S3Token(method, path, sha, md5 string, t time.Time) string {
+type S3Token struct {
+	Token    string
+	Location string
+	Time     time.Time
+}
+
+func S3NewToken(method, path, sha, md5 string) *S3Token {
+	t := time.Now().UTC()
+	token := S3SignedToken(method, path, sha, md5, t)
+	location := fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, path)
+	return &S3Token{
+		Token:    token,
+		Location: location,
+		Time:     t,
+	}
+}
+
+func S3SignedToken(method, path, sha, md5 string, t time.Time) string {
 	canonicalRequest := CanonicalRequest(method, path, sha, md5, t)
 	stringToSign := StringToSign(canonicalRequest, t)
 	signature := Signature(stringToSign, t)
