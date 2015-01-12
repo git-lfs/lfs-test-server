@@ -2,14 +2,12 @@ package main
 
 import (
 	"testing"
-	"time"
 )
 
 var (
 	content    = "Welcome to Amazon S3."
 	contentSha string
 	path       = "/test%24file.text"
-	now        time.Time
 )
 
 func TestCanonicalRequest(t *testing.T) {
@@ -63,15 +61,6 @@ func TestS3Token(t *testing.T) {
 	if token.Location != expectedLocation {
 		t.Fatalf("incorrect token location\nexpected:\n%s\n\ngot:\n%s", expectedLocation, token.Location)
 	}
-}
-
-func testSetup() {
-	Config.AwsKey = "AKIAIOSFODNN7EXAMPLE"
-	Config.AwsSecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-	Config.AwsBucket = "examplebucket"
-
-	contentSha = sha256Hex([]byte(content))
-	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
 }
 
 const (

@@ -27,6 +27,10 @@ type link struct {
 }
 
 func main() {
+	log.Fatal(http.ListenAndServe(":8083", newServer()))
+}
+
+func newServer() http.Handler {
 	router := mux.NewRouter()
 
 	s := router.Path("/{user}/{repo}/objects/{oid}").Subrouter()
@@ -36,7 +40,7 @@ func main() {
 	s.Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
 	s.Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
 
-	log.Fatal(http.ListenAndServe(":8083", router))
+	return router
 }
 
 // 200 - Serve the content
@@ -120,39 +124,25 @@ func oidPath(oid string) string {
 
 // getMeta validate's a user's access to the repo and gets object metadata
 func getMeta(user, repo, oid string) (*Meta, error) {
-	// Check for user / repo access
-
-	// Get metadata - this example just pulls meta from s3
-	url := fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, oidPath(oid))
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	token := S3NewToken("HEAD", oidPath(oid), oid)
-	req.Header.Add("date", token.Time.Format(http.TimeFormat))
-	req.Header.Add("authorization", token.Token)
-	req.Header.Add("x-amz-content-sha256", oid)
-
-	res, err := http.DefaultClient.Do(req)
+	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, oid)
+	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 
 	if res.StatusCode == 200 || res.StatusCode == 404 {
-		return newMeta(oid, res.ContentLength, true), nil
+		var meta Meta
+		dec := json.NewDecoder(res.Body)
+		err := dec.Decode(&meta)
+		if err != nil {
+		}
+		meta.Links = make(map[string]*link)
+		meta.writeable = true
+
+		return &meta, nil
 	}
 
 	return nil, fmt.Errorf("s3 status: %d", res.StatusCode)
-}
-
-func newMeta(oid string, size int64, writeable bool) *Meta {
-	return &Meta{
-		Oid:       oid,
-		Size:      size,
-		Links:     make(map[string]*link),
-		writeable: writeable,
-	}
 }
 
 func newLink(method, oid string) *link {
