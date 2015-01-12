@@ -8,22 +8,38 @@ import (
 	"path/filepath"
 )
 
+const (
+	contentMediaType = "application/vnd.git-media"
+	metaMediaType    = contentMediaType + ".json"
+)
+
 func main() {
 	router := mux.NewRouter()
 
 	s := router.Path("/{user}/{repo}/objects/{oid}").Subrouter()
 
-	s.Methods("GET").Headers("Accept", "application/vnd.git-media").HandlerFunc(GetHandler)
-	s.Methods("GET").Headers("Accept", "application/vnd.git-media+json").HandlerFunc(GetUploadHandler)
+	s.Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler)
+	s.Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
 
 	log.Fatal(http.ListenAndServe(":8083", router))
 }
 
-func GetHandler(w http.ResponseWriter, r *http.Request) {
+func GetContentHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	oid := vars["oid"]
+	path := oidPath(oid)
+	token := S3NewToken("GET", path, oid)
 
+	header := w.Header()
+	header.Set("Git-Media-Set-Date", token.Time.Format(http.TimeFormat))
+	header.Set("Git-Media-Set-Authorization", token.Token)
+	header.Set("Git-Media-Set-x-amz-content-sha256", oid)
+	header.Set("Location", token.Location)
+	w.WriteHeader(302)
 }
 
-func GetUploadHandler(w http.ResponseWriter, r *http.Request) {
+// Get the rest of the metadata
+func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	oid := vars["oid"]
 	path := oidPath(oid)
@@ -41,6 +57,7 @@ func GetUploadHandler(w http.ResponseWriter, r *http.Request) {
 	links["callback"] = "http://somecallback.com"
 	m["_links"] = links
 
+	w.Header().Set("Content-Type", metaMediaType)
 	enc := json.NewEncoder(w)
 	enc.Encode(m)
 }
