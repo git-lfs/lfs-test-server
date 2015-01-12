@@ -15,11 +15,15 @@ const (
 )
 
 type Meta struct {
-	Oid    string            `json:"oid"`
-	Size   int64             `json:"size"`
+	Oid       string           `json:"oid"`
+	Size      int64            `json:"size"`
+	Links     map[string]*link `json:"_links"`
+	writeable bool             `json:"-"`
+}
+
+type link struct {
+	Href   string            `json:"href"`
 	Header map[string]string `json:"header"`
-	Links  map[string]string `json:"_links"`
-	Exists bool              `json:"exists"`
 }
 
 func main() {
@@ -40,9 +44,11 @@ func main() {
 // 404 - No access or content does not exist
 func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
 	oid := vars["oid"]
 
-	_, err := getMeta(oid) // TODO - really needs to check auth
+	_, err := getMeta(user, repo, oid) // TODO - really needs to check auth
 	if err != nil {
 		log.Printf("getMeta error: %s", err)
 		w.WriteHeader(404)
@@ -64,23 +70,25 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 // 404 - can't access / repo does not exist for this user
 func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
 	oid := vars["oid"]
 
-	meta, err := getMeta(oid)
+	meta, err := getMeta(user, repo, oid)
 	if err != nil {
 		log.Printf("getMeta error: %s", err)
-		w.WriteHeader(404) // TODO real error
+		w.WriteHeader(404)
 		return
 	}
 
-	token := S3NewToken("PUT", oidPath(oid), oid)
+	// Download link
+	meta.Links["download"] = newLink("GET", oid)
 
-	meta.Header["Date"] = token.Time.Format(http.TimeFormat)
-	meta.Header["Authorization"] = token.Token
-	meta.Header["x-amz-content-sha256"] = oid
-
-	meta.Links["upload"] = token.Location
-	meta.Links["callback"] = "http://somecallback.com"
+	// Upload link, if it's writeable
+	if meta.writeable {
+		meta.Links["upload"] = newLink("PUT", oid)
+		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
+	}
 
 	w.Header().Set("Content-Type", metaMediaType)
 
@@ -111,7 +119,11 @@ func oidPath(oid string) string {
 	return filepath.Join("/", dir, oid)
 }
 
-func getMeta(oid string) (*Meta, error) {
+// getMeta validate's a user's access to the repo and gets object metadata
+func getMeta(user, repo, oid string) (*Meta, error) {
+	// Check for user / repo access
+
+	// Get metadata - this example just pulls meta from s3
 	url := fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, oidPath(oid))
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
@@ -128,22 +140,28 @@ func getMeta(oid string) (*Meta, error) {
 		return nil, err
 	}
 
-	switch res.StatusCode {
-	case 200:
+	if res.StatusCode == 200 || res.StatusCode == 404 {
 		return newMeta(oid, res.ContentLength, true), nil
-	case 404:
-		return newMeta(oid, 0, false), nil
-	default:
-		return nil, fmt.Errorf("s3 status: %d", res.StatusCode)
+	}
+
+	return nil, fmt.Errorf("s3 status: %d", res.StatusCode)
+}
+
+func newMeta(oid string, size int64, writeable bool) *Meta {
+	return &Meta{
+		Oid:       oid,
+		Size:      size,
+		Links:     make(map[string]*link),
+		writeable: writeable,
 	}
 }
 
-func newMeta(oid string, size int64, exists bool) *Meta {
-	return &Meta{
-		Oid:    oid,
-		Size:   size,
-		Header: make(map[string]string),
-		Links:  make(map[string]string),
-		Exists: exists,
-	}
+func newLink(method, oid string) *link {
+	token := S3NewToken(method, oidPath(oid), oid)
+	header := make(map[string]string)
+	header["Date"] = token.Time.Format(http.TimeFormat)
+	header["Authorization"] = token.Token
+	header["x-amz-content-sha256"] = oid
+
+	return &link{Href: token.Location, Header: header}
 }
