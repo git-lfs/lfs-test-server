@@ -11,7 +11,7 @@ import (
 
 const (
 	contentMediaType = "application/vnd.git-media"
-	metaMediaType    = contentMediaType + ".json"
+	metaMediaType    = contentMediaType + "+json"
 )
 
 type Meta struct {
