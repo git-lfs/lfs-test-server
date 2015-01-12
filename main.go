@@ -29,6 +29,8 @@ func main() {
 
 	s.Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler)
 	s.Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
+	s.Methods("OPTION").Headers("Accept", contentMediaType).HandlerFunc(OptionHandler)
+	s.Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
 
 	log.Fatal(http.ListenAndServe(":8083", router))
 }
@@ -84,6 +86,23 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
+}
+
+// 200 - able to send, server has
+// 204 - able to send, server does not have
+// 403 - user can read but not write
+// 404 - repo does not exist / no access
+func OptionHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(501)
+}
+
+// 200 - object already exists
+// 201 - object uploaded successfully
+// 409 - object contents do not match oid
+// 403 - user can read but not write
+// 404 - repo does not exist / no access
+func PutHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(501)
 }
 
 func oidPath(oid string) string {
