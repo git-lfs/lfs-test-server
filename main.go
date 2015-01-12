@@ -33,7 +33,7 @@ func main() {
 
 	s.Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler)
 	s.Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
-	s.Methods("OPTION").Headers("Accept", contentMediaType).HandlerFunc(OptionHandler)
+	s.Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
 	s.Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
 
 	log.Fatal(http.ListenAndServe(":8083", router))
@@ -100,7 +100,7 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 // 204 - able to send, server does not have
 // 403 - user can read but not write
 // 404 - repo does not exist / no access
-func OptionHandler(w http.ResponseWriter, r *http.Request) {
+func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(501)
 }
 
