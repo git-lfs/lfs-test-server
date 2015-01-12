@@ -55,8 +55,7 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := S3NewToken("HEAD", oidPath(oid), oid)
-
+	token := S3NewToken("GET", oidPath(oid), oid)
 	header := w.Header()
 	header.Set("Git-Media-Set-Date", token.Time.Format(http.TimeFormat))
 	header.Set("Git-Media-Set-Authorization", token.Token)
