@@ -32,7 +32,7 @@ type link struct {
 }
 
 func main() {
-	log.Fatal(http.ListenAndServe(":8083", newServer()))
+	log.Fatal(http.ListenAndServe(Config.Address, newServer()))
 }
 
 func newServer() http.Handler {

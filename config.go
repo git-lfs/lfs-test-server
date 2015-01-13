@@ -13,6 +13,7 @@ type Configuration struct {
 	AwsBucket    string
 	AwsRegion    string `config:"us-east-1"`
 	MetaEndpoint string
+	Address      string `config:":8080"`
 }
 
 var Config = &Configuration{}
