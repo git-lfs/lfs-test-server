@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestGetJson(t *testing.T) {
+func TestGetJsonAuthed(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
@@ -52,6 +52,54 @@ func TestGetJson(t *testing.T) {
 	}
 }
 
+func TestGetJsonUnauthed(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+unauthedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Accept", metaMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 404 {
+		t.Fatalf("expected status 404, got %d %s", res.StatusCode, req.URL)
+	}
+}
+
+func TestGetJsonReadOnly(t *testing.T) {
+
+}
+
+func TestGetAuthed(t *testing.T) {
+
+}
+
+func TestGetUnauthed(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+unauthedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 404 {
+		t.Fatalf("expected status 404, got %d %s", res.StatusCode, req.URL)
+	}
+}
+
 var (
 	now         time.Time
 	mediaServer *httptest.Server
@@ -85,7 +133,11 @@ func newMetaServer() http.Handler {
 	router.HandleFunc("/{user}/{repo}/{oid}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		oid := vars["oid"]
-		fmt.Fprintf(w, `{"oid":"%s","size":42}`, oid)
+		if oid == authedOid {
+			fmt.Fprintf(w, `{"oid":"%s","size":42}`, oid)
+		} else {
+			w.WriteHeader(404)
+		}
 	})
 	return router
 }

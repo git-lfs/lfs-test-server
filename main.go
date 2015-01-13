@@ -54,7 +54,6 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := getMeta(user, repo, oid) // TODO - really needs to check auth
 	if err != nil {
-		log.Printf("getMeta error: %s", err)
 		w.WriteHeader(404)
 		return
 	}
@@ -79,7 +78,6 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	meta, err := getMeta(user, repo, oid)
 	if err != nil {
-		log.Printf("getMeta error: %s", err)
 		w.WriteHeader(404)
 		return
 	}
@@ -130,7 +128,7 @@ func getMeta(user, repo, oid string) (*Meta, error) {
 		return nil, err
 	}
 
-	if res.StatusCode == 200 || res.StatusCode == 404 {
+	if res.StatusCode == 200 {
 		var meta Meta
 		dec := json.NewDecoder(res.Body)
 		err := dec.Decode(&meta)
