@@ -49,12 +49,7 @@ func newServer() http.Handler {
 }
 
 func GetContentHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-	oid := vars["oid"]
-
-	meta, err := getMeta(r, user, repo, oid)
+	meta, err := getMeta(r)
 	if err != nil {
 		w.WriteHeader(404)
 		return
@@ -70,12 +65,7 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-	oid := vars["oid"]
-
-	m, err := getMeta(r, user, repo, oid)
+	m, err := getMeta(r)
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
@@ -87,10 +77,10 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 		Size:  m.Size,
 		Links: make(map[string]*link),
 	}
-	meta.Links["download"] = newLink("GET", oid)
+	meta.Links["download"] = newLink("GET", meta.Oid)
 
 	if m.Writeable {
-		meta.Links["upload"] = newLink("PUT", oid)
+		meta.Links["upload"] = newLink("PUT", meta.Oid)
 		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 	}
 
@@ -101,12 +91,7 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-	oid := vars["oid"]
-
-	m, err := getMeta(r, user, repo, oid)
+	m, err := getMeta(r)
 	if err != nil {
 		w.WriteHeader(404)
 		return
@@ -133,7 +118,12 @@ func oidPath(oid string) string {
 }
 
 // getMeta validate's a user's access to the repo and gets object metadata
-func getMeta(r *http.Request, user, repo, oid string) (*apiMeta, error) {
+func getMeta(r *http.Request) (*apiMeta, error) {
+	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
+	oid := vars["oid"]
+
 	authz := r.Header.Get("Authorization")
 	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, oid)
 
@@ -150,6 +140,7 @@ func getMeta(r *http.Request, user, repo, oid string) (*apiMeta, error) {
 		return nil, err
 	}
 
+	defer res.Body.Close()
 	if res.StatusCode == 200 {
 		var m apiMeta
 		dec := json.NewDecoder(res.Body)
