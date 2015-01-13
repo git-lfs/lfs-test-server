@@ -54,7 +54,7 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	repo := vars["repo"]
 	oid := vars["oid"]
 
-	meta, err := getMeta(user, repo, oid)
+	meta, err := getMeta(r, user, repo, oid)
 	if err != nil {
 		w.WriteHeader(404)
 		return
@@ -75,7 +75,7 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	repo := vars["repo"]
 	oid := vars["oid"]
 
-	m, err := getMeta(user, repo, oid)
+	m, err := getMeta(r, user, repo, oid)
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
@@ -100,12 +100,26 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(meta)
 }
 
-// 200 - able to send, server has
-// 204 - able to send, server does not have
-// 403 - user can read but not write
-// 404 - repo does not exist / no access
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(501)
+	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
+	oid := vars["oid"]
+
+	m, err := getMeta(r, user, repo, oid)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	if !m.Writeable {
+		w.WriteHeader(403)
+		return
+	}
+
+	if m.Oid == "" {
+		w.WriteHeader(204)
+	}
 }
 
 func PutHandler(w http.ResponseWriter, r *http.Request) {
@@ -119,9 +133,19 @@ func oidPath(oid string) string {
 }
 
 // getMeta validate's a user's access to the repo and gets object metadata
-func getMeta(user, repo, oid string) (*apiMeta, error) {
+func getMeta(r *http.Request, user, repo, oid string) (*apiMeta, error) {
+	authz := r.Header.Get("Authorization")
 	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, oid)
-	res, err := http.Get(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if authz != "" {
+		req.Header.Set("Authorization", authz)
+	}
+
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

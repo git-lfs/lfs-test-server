@@ -18,6 +18,7 @@ func TestGetAuthed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
+	req.Header.Set("Authorization", authedToken)
 	req.Header.Set("Accept", contentMediaType)
 
 	res, err := http.DefaultTransport.RoundTrip(req) // Do not follow the redirect
@@ -34,7 +35,7 @@ func TestGetUnauthed(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+unauthedOid, nil)
+	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -58,6 +59,7 @@ func TestGetMetaAuthedReadWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
+	req.Header.Set("Authorization", authedToken)
 	req.Header.Set("Accept", metaMediaType)
 
 	res, err := http.DefaultClient.Do(req)
@@ -104,6 +106,7 @@ func TestGetMetaAuthedReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
+	req.Header.Set("Authorization", authedToken)
 	req.Header.Set("Accept", metaMediaType)
 
 	res, err := http.DefaultClient.Do(req)
@@ -141,7 +144,7 @@ func TestGetMetaUnauthed(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+unauthedOid, nil)
+	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -156,7 +159,6 @@ func TestGetMetaUnauthed(t *testing.T) {
 		t.Fatalf("expected status 404, got %d", res.StatusCode)
 	}
 
-	// Check unauthorized json message
 	var msg map[string]string
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&msg)
@@ -166,18 +168,119 @@ func TestGetMetaUnauthed(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
+func TestOptionsExistingObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
 
+	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status code 200, got %d", res.StatusCode)
+	}
+}
+
+func TestOptionsNonExistingObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/repo/objects/"+nonexistingOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 204 {
+		t.Fatalf("expected status code 204, got %d", res.StatusCode)
+	}
+}
+
+func TestOptionsReadOnlyExistingObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/readonly/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 403 {
+		t.Fatalf("expected status code 403, got %d", res.StatusCode)
+	}
+}
+
+func TestOptionsReadOnlyNonExistingObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/readonly/objects/"+nonexistingOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 403 {
+		t.Fatalf("expected status code 403, got %d", res.StatusCode)
+	}
+}
+
+func TestOptionsUnauthed(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Accept", contentMediaType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 404 {
+		t.Fatalf("expected status code 404, got %d", res.StatusCode)
+	}
 }
 
 func TestPut(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
-	req, err := http.NewRequest("PUT", mediaServer.URL+"/user/repo/objects/"+unauthedOid, nil)
+	req, err := http.NewRequest("PUT", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
+	req.Header.Set("Authorization", authedToken)
 	req.Header.Set("Accept", contentMediaType)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
@@ -201,6 +304,7 @@ func TestMediaTypesRequired(t *testing.T) {
 		if err != nil {
 			t.Fatalf("request error: %s", err)
 		}
+		req.Header.Set("Authorization", authedToken)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatalf("response error: %s", err)
@@ -217,8 +321,10 @@ var (
 	mediaServer *httptest.Server
 	metaServer  *httptest.Server
 
-	authedOid   = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
-	unauthedOid = "5be476dce1f7c1fbaf41bf9c0097e1725d7d26b74ea93543989d1a2b76fef4a5"
+	authedOid      = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
+	nonexistingOid = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
+
+	authedToken = "AUTHORIZED"
 )
 
 func testSetup() {
@@ -243,19 +349,30 @@ func newMetaServer() http.Handler {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/{user}/{repo}/{oid}", func(w http.ResponseWriter, r *http.Request) {
+		authz := r.Header.Get("Authorization")
+		if authz != authedToken {
+			w.WriteHeader(404)
+			return
+		}
+
 		vars := mux.Vars(r)
 		oid := vars["oid"]
 		repo := vars["repo"]
 
-		if oid == authedOid {
+		if oid == nonexistingOid {
+			if repo == "readonly" {
+				fmt.Fprint(w, `{"writeable":false}`)
+			} else {
+				fmt.Fprint(w, `{"writeable":true}`)
+			}
+		} else {
 			if repo == "readonly" {
 				fmt.Fprintf(w, `{"oid":"%s","size":42,"writeable":false}`, oid)
 			} else {
 				fmt.Fprintf(w, `{"oid":"%s","size":42,"writeable":true}`, oid)
 			}
-		} else {
-			w.WriteHeader(404)
 		}
 	})
+
 	return router
 }
