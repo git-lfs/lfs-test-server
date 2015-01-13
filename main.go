@@ -15,10 +15,15 @@ const (
 )
 
 type Meta struct {
-	Oid       string           `json:"oid"`
-	Size      int64            `json:"size"`
-	Links     map[string]*link `json:"_links"`
-	writeable bool             `json:"-"`
+	Oid   string           `json:"oid"`
+	Size  int64            `json:"size"`
+	Links map[string]*link `json:"_links"`
+}
+
+type apiMeta struct {
+	Oid       string `json:"oid"`
+	Size      int64  `json:"size"`
+	Writeable bool   `json:"writeable"`
 }
 
 type link struct {
@@ -43,34 +48,7 @@ func newServer() http.Handler {
 	return router
 }
 
-// 200 - Serve the content
-// 302 - Redirect to other content storage
-// 404 - No access or content does not exist
 func GetContentHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-	oid := vars["oid"]
-
-	_, err := getMeta(user, repo, oid) // TODO - really needs to check auth
-	if err != nil {
-		w.WriteHeader(404)
-		return
-	}
-
-	token := S3NewToken("GET", oidPath(oid), oid)
-	header := w.Header()
-	header.Set("Git-Media-Set-Date", token.Time.Format(http.TimeFormat))
-	header.Set("Git-Media-Set-Authorization", token.Token)
-	header.Set("Git-Media-Set-x-amz-content-sha256", oid)
-	header.Set("Location", token.Location)
-	w.WriteHeader(302)
-}
-
-// 200 - Serve the metadata
-// 403 - can read but not write
-// 404 - can't access / repo does not exist for this user
-func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	user := vars["user"]
 	repo := vars["repo"]
@@ -82,11 +60,36 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Download link
+	token := S3NewToken("GET", oidPath(meta.Oid), meta.Oid)
+	header := w.Header()
+	header.Set("Git-Media-Set-Date", token.Time.Format(http.TimeFormat))
+	header.Set("Git-Media-Set-Authorization", token.Token)
+	header.Set("Git-Media-Set-x-amz-content-sha256", meta.Oid)
+	header.Set("Location", token.Location)
+	w.WriteHeader(302)
+}
+
+func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
+	oid := vars["oid"]
+
+	m, err := getMeta(user, repo, oid)
+	if err != nil {
+		w.WriteHeader(404)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+		return
+	}
+
+	meta := &Meta{
+		Oid:   m.Oid,
+		Size:  m.Size,
+		Links: make(map[string]*link),
+	}
 	meta.Links["download"] = newLink("GET", oid)
 
-	// Upload link, if it's writeable
-	if meta.writeable {
+	if m.Writeable {
 		meta.Links["upload"] = newLink("PUT", oid)
 		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 	}
@@ -105,13 +108,8 @@ func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(501)
 }
 
-// 200 - object already exists
-// 201 - object uploaded successfully
-// 409 - object contents do not match oid
-// 403 - user can read but not write
-// 404 - repo does not exist / no access
 func PutHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(501)
+	w.WriteHeader(405)
 }
 
 func oidPath(oid string) string {
@@ -121,7 +119,7 @@ func oidPath(oid string) string {
 }
 
 // getMeta validate's a user's access to the repo and gets object metadata
-func getMeta(user, repo, oid string) (*Meta, error) {
+func getMeta(user, repo, oid string) (*apiMeta, error) {
 	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, oid)
 	res, err := http.Get(url)
 	if err != nil {
@@ -129,15 +127,14 @@ func getMeta(user, repo, oid string) (*Meta, error) {
 	}
 
 	if res.StatusCode == 200 {
-		var meta Meta
+		var m apiMeta
 		dec := json.NewDecoder(res.Body)
-		err := dec.Decode(&meta)
+		err := dec.Decode(&m)
 		if err != nil {
+			return nil, err
 		}
-		meta.Links = make(map[string]*link)
-		meta.writeable = true
 
-		return &meta, nil
+		return &m, nil
 	}
 
 	return nil, fmt.Errorf("s3 status: %d", res.StatusCode)
