@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -338,6 +340,8 @@ func testSetup() {
 	mediaServer = httptest.NewServer(newServer())
 	metaServer = httptest.NewServer(newMetaServer())
 	Config.MetaEndpoint = metaServer.URL
+
+	logger = log.New(ioutil.Discard, "", log.LstdFlags)
 }
 
 func testTeardown() {
