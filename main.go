@@ -85,15 +85,9 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meta := &Meta{
-		Oid:   m.Oid,
-		Size:  m.Size,
-		Links: make(map[string]*link),
-	}
-	meta.Links["download"] = newLink("GET", meta.Oid)
-
 	w.Header().Set("Content-Type", metaMediaType)
 
+	meta := newMeta(m, false)
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
 	logRequest(r, 200)
@@ -108,20 +102,10 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meta := &Meta{
-		Oid:   m.Oid,
-		Size:  m.Size,
-		Links: make(map[string]*link),
-	}
-
 	if !m.Writeable {
 		w.WriteHeader(403)
 		return
 	}
-
-	meta.Links["download"] = newLink("GET", meta.Oid)
-	meta.Links["upload"] = newLink("PUT", meta.Oid)
-	meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 
 	w.Header().Set("Content-Type", metaMediaType)
 
@@ -129,6 +113,7 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(201)
 	}
 
+	meta := newMeta(m, true)
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
 	logRequest(r, 201)
@@ -161,13 +146,6 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 405)
 }
 
-func oidPath(oid string) string {
-	dir := filepath.Join(oid[0:2], oid[2:4])
-
-	return filepath.Join("/", dir, oid)
-}
-
-// getMeta validate's a user's access to the repo and gets object metadata
 func getMeta(r *http.Request) (*apiMeta, error) {
 	vars := mux.Vars(r)
 	user := vars["user"]
@@ -214,7 +192,6 @@ func sendMeta(r *http.Request) (*apiMeta, error) {
 	user := vars["user"]
 	repo := vars["repo"]
 
-	// Oid and size are in the json body
 	var m apiMeta
 	dec := json.NewDecoder(r.Body)
 	err := dec.Decode(&m)
@@ -230,7 +207,7 @@ func sendMeta(r *http.Request) (*apiMeta, error) {
 	enc := json.NewEncoder(&buf)
 	enc.Encode(&m)
 
-	req, err := http.NewRequest("POST", url, &buf) // what body to send?
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
@@ -264,6 +241,20 @@ func sendMeta(r *http.Request) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
+func newMeta(m *apiMeta, download bool) *Meta {
+	meta := &Meta{
+		Oid:   m.Oid,
+		Size:  m.Size,
+		Links: make(map[string]*link),
+	}
+	meta.Links["download"] = newLink("GET", meta.Oid)
+	if download {
+		meta.Links["upload"] = newLink("PUT", meta.Oid)
+		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
+	}
+	return meta
+}
+
 func newLink(method, oid string) *link {
 	token := S3NewToken(method, oidPath(oid), oid)
 	header := make(map[string]string)
@@ -272,6 +263,12 @@ func newLink(method, oid string) *link {
 	header["x-amz-content-sha256"] = oid
 
 	return &link{Href: token.Location, Header: header}
+}
+
+func oidPath(oid string) string {
+	dir := filepath.Join(oid[0:2], oid[2:4])
+
+	return filepath.Join("/", dir, oid)
 }
 
 func logRequest(r *http.Request, status int) {
