@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -15,6 +16,7 @@ var (
 
 const (
 	dateLayout = "20060102"
+	isoLayout  = "20060102T000000Z"
 )
 
 type S3Token struct {
@@ -23,49 +25,45 @@ type S3Token struct {
 	Time     time.Time
 }
 
-func S3NewToken(method, path, sha string) *S3Token {
+func S3SignHeader(method, path, sha string) *S3Token {
 	t := time.Now().UTC()
-	token := S3SignedToken(method, path, sha, t)
-	location := fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, path)
 	return &S3Token{
-		Token:    token,
-		Location: location,
+		Token:    signedHeaderToken(method, path, sha, t),
+		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, path),
 		Time:     t,
 	}
 }
 
-func S3SignedToken(method, path, sha string, t time.Time) string {
-	canonicalRequest := CanonicalRequest(method, path, sha, t)
-	stringToSign := StringToSign(canonicalRequest, t)
-	signature := Signature(stringToSign, t)
+func S3SignQuery(method, path string, expires int) *S3Token {
+	t := time.Now().UTC()
 
-	return fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s/%s/s3/aws4_request,SignedHeaders=%s,Signature=%s",
-		Config.AwsKey,
-		t.Format(dateLayout),
-		Config.AwsRegion,
-		signedHeaders,
-		signature,
-	)
+	sig := signedQueryToken(method, path, expires, t)
+
+	v := url.Values{}
+	v.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+	v.Set("X-Amz-Credential", fmt.Sprintf("%s/%s/%s/s3/aws4_request", Config.AwsKey, t.Format(dateLayout), Config.AwsRegion))
+	v.Set("X-Amz-Date", t.Format(isoLayout))
+	v.Set("X-Amz-Expires", fmt.Sprintf("%d", expires))
+	v.Set("X-Amz-SignedHeaders", "host")
+	v.Set("X-Amz-Signature", sig)
+	return &S3Token{
+		Token:    sig,
+		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s?%s", Config.AwsBucket, path, v.Encode()),
+		Time:     t,
+	}
 }
 
-func Signature(sts string, t time.Time) string {
-	kDate := hmacSha256([]byte(fmt.Sprintf("AWS4%s", Config.AwsSecretKey)), []byte(t.Format(dateLayout)))
-	kRegion := hmacSha256(kDate, []byte(Config.AwsRegion))
-	kService := hmacSha256(kRegion, []byte("s3"))
-	kCreds := hmacSha256(kService, []byte("aws4_request"))
-	return hmacSha256Hex(kCreds, []byte(sts))
+func signedHeaderToken(method, path, sha string, t time.Time) string {
+	return token(canonicalRequestHeader(method, path, sha, t), t)
 }
 
-func StringToSign(request string, t time.Time) string {
-	return fmt.Sprintf("AWS4-HMAC-SHA256\n%s\n%s/%s/s3/aws4_request\n%s",
-		t.Format(http.TimeFormat),
-		t.Format(dateLayout),
-		Config.AwsRegion,
-		sha256Hex([]byte(request)),
-	)
+func signedQueryToken(method, path string, expires int, t time.Time) string {
+	c := canonicalRequestQuery(method, path, expires, t)
+	stringToSign := stringToSign(c, t)
+	return signature(stringToSign, t)
 }
 
-func CanonicalRequest(method, path, sha string, t time.Time) string {
+func canonicalRequestHeader(method, path, sha string, t time.Time) string {
 	return fmt.Sprintf("%s\n%s\n\ndate:%s\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\n\n%s\n%s",
 		method,
 		path,
@@ -74,6 +72,49 @@ func CanonicalRequest(method, path, sha string, t time.Time) string {
 		sha,
 		signedHeaders,
 		sha,
+	)
+}
+
+func canonicalRequestQuery(method, path string, expires int, t time.Time) string {
+	return fmt.Sprintf("%s\n%s\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s%%2F%s%%2Fs3%%2Faws4_request&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host\nhost:%s.s3.amazonaws.com\n\nhost",
+		method,
+		path,
+		Config.AwsKey,
+		t.Format(dateLayout),
+		Config.AwsRegion,
+		t.Format(isoLayout),
+		expires,
+		Config.AwsBucket,
+	)
+}
+
+func stringToSign(request string, t time.Time) string {
+	return fmt.Sprintf("AWS4-HMAC-SHA256\n%s\n%s/%s/s3/aws4_request\n%s",
+		t.Format(http.TimeFormat),
+		t.Format(dateLayout),
+		Config.AwsRegion,
+		sha256Hex([]byte(request)),
+	)
+}
+
+func signature(sts string, t time.Time) string {
+	kDate := hmacSha256([]byte(fmt.Sprintf("AWS4%s", Config.AwsSecretKey)), []byte(t.Format(dateLayout)))
+	kRegion := hmacSha256(kDate, []byte(Config.AwsRegion))
+	kService := hmacSha256(kRegion, []byte("s3"))
+	kCreds := hmacSha256(kService, []byte("aws4_request"))
+	return hmacSha256Hex(kCreds, []byte(sts))
+}
+
+func token(c string, t time.Time) string {
+	stringToSign := stringToSign(c, t)
+	sig := signature(stringToSign, t)
+
+	return fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s/%s/s3/aws4_request,SignedHeaders=%s,Signature=%s",
+		Config.AwsKey,
+		t.Format(dateLayout),
+		Config.AwsRegion,
+		signedHeaders,
+		sig,
 	)
 }
 

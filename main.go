@@ -66,12 +66,8 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := S3NewToken("GET", oidPath(meta.Oid), meta.Oid)
-	header := w.Header()
-	header.Set("Git-Media-Set-Date", token.Time.Format(http.TimeFormat))
-	header.Set("Git-Media-Set-Authorization", token.Token)
-	header.Set("Git-Media-Set-x-amz-content-sha256", meta.Oid)
-	header.Set("Location", token.Location)
+	token := S3SignHeader("GET", oidPath(meta.Oid), meta.Oid)
+	w.Header().Set("Location", token.Location)
 	w.WriteHeader(302)
 	logRequest(r, 302)
 }
@@ -256,7 +252,7 @@ func newMeta(m *apiMeta, download bool) *Meta {
 }
 
 func newLink(method, oid string) *link {
-	token := S3NewToken(method, oidPath(oid), oid)
+	token := S3SignHeader(method, oidPath(oid), oid)
 	header := make(map[string]string)
 	header["Date"] = token.Time.Format(http.TimeFormat)
 	header["Authorization"] = token.Token
