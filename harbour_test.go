@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -116,6 +117,157 @@ func TestGetMetaUnauthed(t *testing.T) {
 
 	if m := msg["message"]; m != "Not Found" {
 		t.Fatalf("expected a message in the 404 json response")
+	}
+}
+
+func TestPostAuthedNewObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("POST", mediaServer.URL+"/user/repo/objects", nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", metaMediaType)
+
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, nonexistingOid))
+	req.Body = ioutil.NopCloser(buf)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 201 {
+		t.Fatalf("expected status 201, got %d", res.StatusCode)
+	}
+
+	var meta Meta
+	dec := json.NewDecoder(res.Body)
+	dec.Decode(&meta)
+
+	if meta.Oid != nonexistingOid {
+		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", nonexistingOid, meta.Oid)
+	}
+
+	if meta.Size != 1234 {
+		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
+	}
+
+	download := meta.Links["download"]
+	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(nonexistingOid) {
+		t.Fatalf("expected download link, got %s", download.Href)
+	}
+
+	upload, ok := meta.Links["upload"]
+	if !ok {
+		t.Fatalf("expected upload link to be present")
+	}
+
+	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(nonexistingOid) {
+		t.Fatalf("expected upload link, got %s", upload.Href)
+	}
+
+	// Check callback
+}
+
+func TestPostAuthedExistingObject(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("POST", mediaServer.URL+"/user/repo/objects", nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", metaMediaType)
+
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, authedOid))
+	req.Body = ioutil.NopCloser(buf)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
+	}
+
+	var meta Meta
+	dec := json.NewDecoder(res.Body)
+	dec.Decode(&meta)
+
+	if meta.Oid != authedOid {
+		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", authedOid, meta.Oid)
+	}
+
+	if meta.Size != 1234 {
+		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
+	}
+
+	download := meta.Links["download"]
+	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
+		t.Fatalf("expected download link, got %s", download.Href)
+	}
+
+	upload, ok := meta.Links["upload"]
+	if !ok {
+		t.Fatalf("expected upload link to be present")
+	}
+
+	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
+		t.Fatalf("expected upload link, got %s", upload.Href)
+	}
+
+	// Check callback
+}
+
+func TestPostAuthedReadOnly(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("POST", mediaServer.URL+"/user/readonly/objects", nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", metaMediaType)
+
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, authedOid))
+	req.Body = ioutil.NopCloser(buf)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 403 {
+		t.Fatalf("expected status 403, got %d", res.StatusCode)
+	}
+}
+
+func TestPostUnauthed(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("POST", mediaServer.URL+"/user/readonly/objects", nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Accept", metaMediaType)
+
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, authedOid))
+	req.Body = ioutil.NopCloser(buf)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 404 {
+		t.Fatalf("expected status 404, got %d", res.StatusCode)
 	}
 }
 
@@ -300,8 +452,9 @@ func testTeardown() {
 
 func newMetaServer() http.Handler {
 	router := mux.NewRouter()
+	s := router.Path("/{user}/{repo}/{oid}").Subrouter()
 
-	router.HandleFunc("/{user}/{repo}/{oid}", func(w http.ResponseWriter, r *http.Request) {
+	s.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authz := r.Header.Get("Authorization")
 		if authz != authedToken {
 			w.WriteHeader(404)
@@ -325,6 +478,36 @@ func newMetaServer() http.Handler {
 				fmt.Fprintf(w, `{"oid":"%s","size":42,"writeable":true}`, oid)
 			}
 		}
+	})
+
+	s.Methods("POST").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authz := r.Header.Get("Authorization")
+		if authz != authedToken {
+			w.WriteHeader(404)
+			return
+		}
+
+		vars := mux.Vars(r)
+		repo := vars["repo"]
+
+		var m apiMeta
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&m)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		if repo == "readonly" {
+			fmt.Fprint(w, `{"writeable":false}`)
+			return
+		}
+
+		if m.Oid == nonexistingOid {
+			w.WriteHeader(201)
+		}
+
+		fmt.Fprintf(w, `{"oid":"%s","size":%d,"writeable":true}`, m.Oid, m.Size)
 	})
 
 	return router

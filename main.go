@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -29,6 +30,7 @@ type apiMeta struct {
 	Oid       string `json:"oid"`
 	Size      int64  `json:"size"`
 	Writeable bool   `json:"writeable"`
+	existing  bool   `json:"-"`
 }
 
 type link struct {
@@ -44,8 +46,10 @@ func main() {
 func newServer() http.Handler {
 	router := mux.NewRouter()
 
-	s := router.Path("/{user}/{repo}/objects/{oid}").Subrouter()
+	o := router.PathPrefix("/{user}/{repo}/objects").Subrouter()
+	o.Methods("POST").Headers("Accept", metaMediaType).HandlerFunc(PostHandler)
 
+	s := o.Path("/{oid}").Subrouter()
 	s.Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler)
 	s.Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
 	s.Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
@@ -93,6 +97,41 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
 	logRequest(r, 200)
+}
+
+func PostHandler(w http.ResponseWriter, r *http.Request) {
+	m, err := sendMeta(r)
+	if err != nil {
+		w.WriteHeader(404)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+		logRequest(r, 404)
+		return
+	}
+
+	meta := &Meta{
+		Oid:   m.Oid,
+		Size:  m.Size,
+		Links: make(map[string]*link),
+	}
+
+	if !m.Writeable {
+		w.WriteHeader(403)
+		return
+	}
+
+	meta.Links["download"] = newLink("GET", meta.Oid)
+	meta.Links["upload"] = newLink("PUT", meta.Oid)
+	meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
+
+	w.Header().Set("Content-Type", metaMediaType)
+
+	if !m.existing {
+		w.WriteHeader(201)
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(meta)
+	logRequest(r, 201)
 }
 
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +205,62 @@ func getMeta(r *http.Request) (*apiMeta, error) {
 		return &m, nil
 	}
 
-	logger.Printf("[META] status - %s", err)
+	logger.Printf("[META] status - %d", res.StatusCode)
+	return nil, fmt.Errorf("status: %d", res.StatusCode)
+}
+
+func sendMeta(r *http.Request) (*apiMeta, error) {
+	vars := mux.Vars(r)
+	user := vars["user"]
+	repo := vars["repo"]
+
+	// Oid and size are in the json body
+	var m apiMeta
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&m)
+	if err != nil {
+		logger.Printf("[META] error - %s", err)
+		return nil, err
+	}
+
+	authz := r.Header.Get("Authorization")
+	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, m.Oid)
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.Encode(&m)
+
+	req, err := http.NewRequest("POST", url, &buf) // what body to send?
+	if err != nil {
+		logger.Printf("[META] error - %s", err)
+		return nil, err
+	}
+	if authz != "" {
+		req.Header.Set("Authorization", authz)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		logger.Printf("[META] error - %s", err)
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode == 200 || res.StatusCode == 201 {
+		var m apiMeta
+		dec := json.NewDecoder(res.Body)
+		err := dec.Decode(&m)
+		if err != nil {
+			logger.Printf("[META] error - %s", err)
+			return nil, err
+		}
+
+		m.existing = res.StatusCode == 200
+
+		return &m, nil
+	}
+
+	logger.Printf("[META] status - %d", res.StatusCode)
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
