@@ -88,11 +88,6 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	meta.Links["download"] = newLink("GET", meta.Oid)
 
-	if m.Writeable {
-		meta.Links["upload"] = newLink("PUT", meta.Oid)
-		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
-	}
-
 	w.Header().Set("Content-Type", metaMediaType)
 
 	enc := json.NewEncoder(w)

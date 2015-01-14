@@ -53,7 +53,7 @@ func TestGetUnauthed(t *testing.T) {
 	}
 }
 
-func TestGetMetaAuthedReadWrite(t *testing.T) {
+func TestGetMetaAuthed(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
@@ -88,57 +88,6 @@ func TestGetMetaAuthedReadWrite(t *testing.T) {
 	download := meta.Links["download"]
 	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
 		t.Fatalf("expected download link, got %s", download.Href)
-	}
-
-	upload, ok := meta.Links["upload"]
-	if !ok {
-		t.Fatalf("expected upload link to be present")
-	}
-
-	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
-		t.Fatalf("expected upload link, got %s", upload.Href)
-	}
-}
-
-func TestGetMetaAuthedReadOnly(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/readonly/objects/"+authedOid, nil)
-	if err != nil {
-		t.Fatalf("request error: %s", err)
-	}
-	req.Header.Set("Authorization", authedToken)
-	req.Header.Set("Accept", metaMediaType)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("response error: %s", err)
-	}
-
-	if res.StatusCode != 200 {
-		t.Fatalf("expected status 200, got %d %s", res.StatusCode, req.URL)
-	}
-
-	var meta Meta
-	dec := json.NewDecoder(res.Body)
-	dec.Decode(&meta)
-
-	if meta.Oid != authedOid {
-		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", authedOid, meta.Oid)
-	}
-
-	if meta.Size != 42 {
-		t.Fatalf("expected to see a size of `42`, got: `%d`", meta.Size)
-	}
-
-	download := meta.Links["download"]
-	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
-		t.Fatalf("expected download link, got %s", download.Href)
-	}
-
-	if _, ok := meta.Links["upload"]; ok {
-		t.Fatal("expected upload link to not be present")
 	}
 }
 
