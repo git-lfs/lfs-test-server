@@ -27,23 +27,34 @@ type link struct {
 	Header map[string]string `json:"header,omitempty"`
 }
 
+type appVars struct {
+	User          string
+	Repo          string
+	Oid           string
+	Size          int64
+	Authorization string
+}
+
+var (
+	router *mux.Router
+)
+
 func newRouter() http.Handler {
-	router := mux.NewRouter()
+	router = mux.NewRouter()
 
 	o := router.PathPrefix("/{user}/{repo}/objects").Subrouter()
 	o.Methods("POST").Headers("Accept", metaMediaType).HandlerFunc(PostHandler)
-
-	s := o.Path("/{oid}").Subrouter()
-	s.Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler)
-	s.Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
-	s.Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
-	s.Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
+	o.Path("/{oid}").Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler).Name("download")
+	o.Path("/{oid}").Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
+	o.Path("/{oid}").Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
+	o.Path("/{oid}").Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
 
 	return router
 }
 
 func GetContentHandler(w http.ResponseWriter, r *http.Request) {
-	meta, err := getMeta(r)
+	av := unpack(r)
+	meta, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
 		logRequest(r, 404)
@@ -57,7 +68,8 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
-	m, err := getMeta(r)
+	av := unpack(r)
+	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
@@ -67,14 +79,15 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	meta := newMeta(m, false)
+	meta := newMeta(m, av, false)
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
 	logRequest(r, 200)
 }
 
 func PostHandler(w http.ResponseWriter, r *http.Request) {
-	m, err := sendMeta(r)
+	av := unpack(r)
+	m, err := SendMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
@@ -93,14 +106,15 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(201)
 	}
 
-	meta := newMeta(m, true)
+	meta := newMeta(m, av, true)
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
 	logRequest(r, 201)
 }
 
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
-	m, err := getMeta(r)
+	av := unpack(r)
+	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
 		logRequest(r, 404)
@@ -126,22 +140,16 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 405)
 }
 
-func getMeta(r *http.Request) (*apiMeta, error) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-	oid := vars["oid"]
-
-	authz := r.Header.Get("Authorization")
-	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, oid)
+func GetMeta(v *appVars) (*apiMeta, error) {
+	url := Config.MetaEndpoint + "/" + filepath.Join(v.User, v.Repo, v.Oid)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
 	}
-	if authz != "" {
-		req.Header.Set("Authorization", authz)
+	if v.Authorization != "" {
+		req.Header.Set("Authorization", v.Authorization)
 	}
 
 	res, err := http.DefaultClient.Do(req)
@@ -167,33 +175,20 @@ func getMeta(r *http.Request) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
-func sendMeta(r *http.Request) (*apiMeta, error) {
-	vars := mux.Vars(r)
-	user := vars["user"]
-	repo := vars["repo"]
-
-	var m apiMeta
-	dec := json.NewDecoder(r.Body)
-	err := dec.Decode(&m)
-	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
-	}
-
-	authz := r.Header.Get("Authorization")
-	url := Config.MetaEndpoint + "/" + filepath.Join(user, repo, m.Oid)
+func SendMeta(v *appVars) (*apiMeta, error) {
+	url := Config.MetaEndpoint + "/" + filepath.Join(v.User, v.Repo, v.Oid)
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	enc.Encode(&m)
+	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
 
 	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
 	}
-	if authz != "" {
-		req.Header.Set("Authorization", authz)
+	if v.Authorization != "" {
+		req.Header.Set("Authorization", v.Authorization)
 	}
 
 	res, err := http.DefaultClient.Do(req)
@@ -221,21 +216,47 @@ func sendMeta(r *http.Request) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
-func newMeta(m *apiMeta, upload bool) *Meta {
+func unpack(r *http.Request) *appVars {
+	vars := mux.Vars(r)
+	av := &appVars{
+		User:          vars["user"],
+		Repo:          vars["repo"],
+		Oid:           vars["oid"],
+		Authorization: r.Header.Get("Authorization"),
+	}
+
+	if r.Method == "POST" {
+		var m appVars
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&m)
+		if err != nil {
+			return av
+		}
+
+		av.Oid = m.Oid
+		av.Size = m.Size
+	}
+
+	return av
+}
+
+func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
 	meta := &Meta{
 		Oid:   m.Oid,
 		Size:  m.Size,
 		Links: make(map[string]*link),
 	}
-	meta.Links["download"] = newLink("GET", meta.Oid)
+
+	path, _ := router.Get("download").URLPath("user", v.User, "repo", v.Repo, "oid", m.Oid)
+	meta.Links["download"] = &link{Href: fmt.Sprintf("https://%s%s", Config.Host, path)}
 	if upload {
-		meta.Links["upload"] = newLink("PUT", meta.Oid)
+		meta.Links["upload"] = signedLink("PUT", meta.Oid)
 		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 	}
 	return meta
 }
 
-func newLink(method, oid string) *link {
+func signedLink(method, oid string) *link {
 	token := S3SignHeader(method, oidPath(oid), oid)
 	header := make(map[string]string)
 	header["Authorization"] = token.Token

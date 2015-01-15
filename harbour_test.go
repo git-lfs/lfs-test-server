@@ -87,7 +87,7 @@ func TestGetMetaAuthed(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
+	if download.Href != "https://127.0.0.1/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 }
@@ -156,7 +156,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(nonexistingOid) {
+	if download.Href != "https://127.0.0.1/user/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
@@ -208,7 +208,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
+	if download.Href != "https://127.0.0.1/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
