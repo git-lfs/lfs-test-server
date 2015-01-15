@@ -237,14 +237,14 @@ func sendMeta(r *http.Request) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
-func newMeta(m *apiMeta, download bool) *Meta {
+func newMeta(m *apiMeta, upload bool) *Meta {
 	meta := &Meta{
 		Oid:   m.Oid,
 		Size:  m.Size,
 		Links: make(map[string]*link),
 	}
 	meta.Links["download"] = newLink("GET", meta.Oid)
-	if download {
+	if upload {
 		meta.Links["upload"] = newLink("PUT", meta.Oid)
 		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 	}
@@ -254,9 +254,9 @@ func newMeta(m *apiMeta, download bool) *Meta {
 func newLink(method, oid string) *link {
 	token := S3SignHeader(method, oidPath(oid), oid)
 	header := make(map[string]string)
-	header["Date"] = token.Time.Format(http.TimeFormat)
 	header["Authorization"] = token.Token
 	header["x-amz-content-sha256"] = oid
+	header["x-amz-date"] = token.Time.Format(isoLayout)
 
 	return &link{Href: token.Location, Header: header}
 }

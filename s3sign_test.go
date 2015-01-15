@@ -82,7 +82,7 @@ func TestS3QuerySignatureLocation(t *testing.T) {
 }
 
 const (
-	expectedHeaderToken = `AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256,Signature=6eb5d2a63d219da38ce1e6d23114b5800721dc63c2b66dca4f7612d0fb13f975`
-	expectedQueryToken  = `4696984d3b6c1716e0aa28358ef3a6f2abf18a08c86751488935960fce58000e`
+	expectedHeaderToken = `AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=1e15d288c066d54cc20d8f664ade3fa96e6744b2861304671f6eb633045a2d4a`
+	expectedQueryToken  = `aa3bfd20c9769c0a95f556fc43ed6665f3f2f875950ad4fe53e84de73f0b2022`
 	expectedLocation    = `https://examplebucket.s3.amazonaws.com/test%24file.text`
 )

@@ -5,18 +5,17 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"net/url"
 	"time"
 )
 
 var (
-	signedHeaders = "date;host;x-amz-content-sha256"
+	signedHeaders = "host;x-amz-content-sha256;x-amz-date"
 )
 
 const (
 	dateLayout = "20060102"
-	isoLayout  = "20060102T000000Z"
+	isoLayout  = "20060102T150405Z"
 )
 
 type S3Token struct {
@@ -64,19 +63,19 @@ func signedQueryToken(method, path string, expires int, t time.Time) string {
 }
 
 func canonicalRequestHeader(method, path, sha string, t time.Time) string {
-	return fmt.Sprintf("%s\n%s\n\ndate:%s\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\n\n%s\n%s",
+	return fmt.Sprintf("%s\n%s\n\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-date:%s\n\n%s\n%s",
 		method,
 		path,
-		t.Format(http.TimeFormat),
 		Config.AwsBucket,
 		sha,
+		t.Format(isoLayout),
 		signedHeaders,
 		sha,
 	)
 }
 
 func canonicalRequestQuery(method, path string, expires int, t time.Time) string {
-	return fmt.Sprintf("%s\n%s\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s%%2F%s%%2Fs3%%2Faws4_request&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host\nhost:%s.s3.amazonaws.com\n\nhost",
+	return fmt.Sprintf("%s\n%s\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s%%2F%s%%2Fs3%%2Faws4_request&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host\nhost:%s.s3.amazonaws.com\n\nhost\nUNSIGNED-PAYLOAD",
 		method,
 		path,
 		Config.AwsKey,
@@ -90,7 +89,7 @@ func canonicalRequestQuery(method, path string, expires int, t time.Time) string
 
 func stringToSign(request string, t time.Time) string {
 	return fmt.Sprintf("AWS4-HMAC-SHA256\n%s\n%s/%s/s3/aws4_request\n%s",
-		t.Format(http.TimeFormat),
+		t.Format(isoLayout),
 		t.Format(dateLayout),
 		Config.AwsRegion,
 		sha256Hex([]byte(request)),
