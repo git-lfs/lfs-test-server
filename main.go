@@ -66,7 +66,7 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := S3SignHeader("GET", oidPath(meta.Oid), meta.Oid)
+	token := S3SignQuery("GET", oidPath(meta.Oid), 86400)
 	w.Header().Set("Location", token.Location)
 	w.WriteHeader(302)
 	logRequest(r, 302)
