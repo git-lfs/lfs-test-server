@@ -438,7 +438,7 @@ func testSetup() {
 	contentSha = sha256Hex([]byte(content))
 	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
 
-	mediaServer = httptest.NewServer(newServer())
+	mediaServer = httptest.NewServer(newRouter())
 	metaServer = httptest.NewServer(newMetaServer())
 	Config.MetaEndpoint = metaServer.URL
 
