@@ -23,7 +23,7 @@ var (
 type Meta struct {
 	Oid   string           `json:"oid"`
 	Size  int64            `json:"size"`
-	Links map[string]*link `json:"_links"`
+	Links map[string]*link `json:"_links,omitempty"`
 }
 
 type apiMeta struct {
@@ -35,7 +35,7 @@ type apiMeta struct {
 
 type link struct {
 	Href   string            `json:"href"`
-	Header map[string]string `json:"header"`
+	Header map[string]string `json:"header,omitempty"`
 }
 
 func main() {
