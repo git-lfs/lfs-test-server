@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 )
 
 const (
@@ -17,7 +21,8 @@ const (
 )
 
 var (
-	logger = log.New(os.Stdout, "harbour:", log.LstdFlags)
+	logger  = log.New(os.Stdout, "harbour:", log.LstdFlags)
+	baseUrl string
 )
 
 type Meta struct {
@@ -39,8 +44,41 @@ type link struct {
 }
 
 func main() {
-	logger.Printf("Listening on %s", Config.Address)
-	log.Fatal(http.ListenAndServe(Config.Address, newServer()))
+	var listener net.Listener
+
+	a, err := url.Parse(Config.Address)
+	if err != nil {
+		log.Fatalf("Could not parse listen address: %s, %s", Config.Address, err)
+	}
+
+	laddr, err := net.ResolveTCPAddr(a.Scheme, a.Host)
+	if err != nil {
+		log.Fatalf("Could not resolve listen address: %s, %s", Config.Address, err)
+	}
+
+	listener, err = net.ListenTCP(a.Scheme, laddr)
+	if err != nil {
+		log.Fatalf("Can't listen on address %s, %s", Config.Address, err)
+	}
+
+	tl := NewTrackingListener(listener)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP)
+	go func(c chan os.Signal, listener net.Listener) {
+		for {
+			sig := <-c
+			switch sig {
+			case syscall.SIGHUP: // Graceful shutdown
+				tl.Close()
+			}
+		}
+	}(c, tl)
+
+	baseUrl = fmt.Sprintf("http://%s", tl.Addr())
+	logger.Printf("[%d] Listening on %s (http://%s)", os.Getpid(), Config.Address, baseUrl)
+	http.Serve(tl, newServer())
+	tl.WaitForChildren()
 }
 
 func newServer() http.Handler {
