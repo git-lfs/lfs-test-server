@@ -136,6 +136,7 @@ func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
 }
