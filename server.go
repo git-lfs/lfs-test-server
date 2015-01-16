@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
@@ -37,7 +41,8 @@ type appVars struct {
 }
 
 var (
-	router *mux.Router
+	router       *mux.Router
+	apiAuthError = errors.New("auth error")
 )
 
 func newRouter() http.Handler {
@@ -89,15 +94,17 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 func PostHandler(w http.ResponseWriter, r *http.Request) {
 	av := unpack(r)
 	m, err := SendMeta(av)
+
+	if err == apiAuthError {
+		logRequest(r, 403)
+		w.WriteHeader(403)
+		return
+	}
+
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
 		logRequest(r, 404)
-		return
-	}
-
-	if !m.Writeable {
-		w.WriteHeader(403)
 		return
 	}
 
@@ -191,8 +198,15 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
 	}
+	req.Header.Set("Accept", Config.ApiMediaType)
 	if v.Authorization != "" {
 		req.Header.Set("Authorization", v.Authorization)
+	}
+
+	if Config.HmacKey != "" {
+		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
+		mac.Write(buf.Bytes())
+		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
 	}
 
 	res, err := http.DefaultClient.Do(req)
@@ -202,6 +216,11 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 	}
 
 	defer res.Body.Close()
+
+	if res.StatusCode == 403 {
+		return nil, apiAuthError
+	}
+
 	if res.StatusCode == 200 || res.StatusCode == 201 {
 		var m apiMeta
 		dec := json.NewDecoder(res.Body)
@@ -210,9 +229,9 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 			logger.Printf("[META] error - %s", err)
 			return nil, err
 		}
-
+		m.Writeable = true // Probably remove this
 		m.existing = res.StatusCode == 200
-
+		logger.Printf("[META] status - %d", res.StatusCode)
 		return &m, nil
 	}
 
@@ -254,14 +273,14 @@ func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
 	path, _ := router.Get("download").URLPath("user", v.User, "repo", v.Repo, "oid", m.Oid)
 	meta.Links["download"] = &link{Href: fmt.Sprintf("https://%s%s", Config.Host, path)}
 	if upload {
-		meta.Links["upload"] = signedLink("PUT", meta.Oid)
+		meta.Links["upload"] = signedLink("PUT", m.PathPrefix, meta.Oid)
 		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
 	}
 	return meta
 }
 
-func signedLink(method, oid string) *link {
-	token := S3SignHeader(method, oidPath(oid), oid)
+func signedLink(method, pathPrefix, oid string) *link {
+	token := S3SignHeader(method, path.Join("/", pathPrefix, oidPath(oid)), oid)
 	header := make(map[string]string)
 	header["Authorization"] = token.Token
 	header["x-amz-content-sha256"] = oid

@@ -499,7 +499,7 @@ func newMetaServer() http.Handler {
 		}
 
 		if repo == "readonly" {
-			fmt.Fprint(w, `{"writeable":false}`)
+			w.WriteHeader(403)
 			return
 		}
 
