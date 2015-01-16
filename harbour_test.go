@@ -452,7 +452,7 @@ func testTeardown() {
 
 func newMetaServer() http.Handler {
 	router := mux.NewRouter()
-	s := router.Path("/{user}/{repo}/{oid}").Subrouter()
+	s := router.Path("/internal/repos/{user}/{repo}/media/blobs/{oid}").Subrouter()
 
 	s.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authz := r.Header.Get("Authorization")

@@ -15,6 +15,7 @@ type Configuration struct {
 	MetaEndpoint string
 	Address      string `config:"tcp4://127.0.0.1:8080"`
 	Host         string `config:"127.0.0.1"`
+	ApiMediaType string `config:"application/vnd.test-api+json"`
 }
 
 var Config = &Configuration{}

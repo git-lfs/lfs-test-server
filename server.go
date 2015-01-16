@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
-	"path/filepath"
+	"path"
 )
 
 type Meta struct {
@@ -16,10 +16,11 @@ type Meta struct {
 }
 
 type apiMeta struct {
-	Oid       string `json:"oid"`
-	Size      int64  `json:"size"`
-	Writeable bool   `json:"writeable"`
-	existing  bool   `json:"-"`
+	Oid        string `json:"oid"`
+	Size       int64  `json:"size"`
+	Writeable  bool   `json:"writeable"`
+	PathPrefix string `json:"path_prefix"`
+	existing   bool   `json:"-"`
 }
 
 type link struct {
@@ -61,7 +62,7 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := S3SignQuery("GET", oidPath(meta.Oid), 86400)
+	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
 	w.Header().Set("Location", token.Location)
 	w.WriteHeader(302)
 	logRequest(r, 302)
@@ -142,13 +143,14 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + filepath.Join(v.User, v.Repo, v.Oid)
+	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
 	}
+	req.Header.Set("Accept", Config.ApiMediaType)
 	if v.Authorization != "" {
 		req.Header.Set("Authorization", v.Authorization)
 	}
@@ -169,6 +171,7 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 			return nil, err
 		}
 
+		logger.Printf("[META] status - %d", res.StatusCode)
 		return &m, nil
 	}
 
@@ -177,7 +180,7 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 }
 
 func SendMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + filepath.Join(v.User, v.Repo, v.Oid)
+	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -268,9 +271,9 @@ func signedLink(method, oid string) *link {
 }
 
 func oidPath(oid string) string {
-	dir := filepath.Join(oid[0:2], oid[2:4])
+	dir := path.Join(oid[0:2], oid[2:4])
 
-	return filepath.Join("/", dir, oid)
+	return path.Join("/", dir, oid)
 }
 
 func logRequest(r *http.Request, status int) {

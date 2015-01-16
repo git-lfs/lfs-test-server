@@ -8,13 +8,13 @@ import (
 var (
 	content    = "Welcome to Amazon S3."
 	contentSha string
-	path       = "/test%24file.text"
+	filePath   = "/test%24file.text"
 )
 
 func TestS3SignedHeaderToken(t *testing.T) {
 	testSetup()
 
-	token := signedHeaderToken("PUT", path, contentSha, now)
+	token := signedHeaderToken("PUT", filePath, contentSha, now)
 
 	if token != expectedHeaderToken {
 		t.Fatalf("incorrect token\nexpected:\n%s\n\ngot:\n%s", expectedHeaderToken, token)
@@ -24,7 +24,7 @@ func TestS3SignedHeaderToken(t *testing.T) {
 func TestS3SignedQueryToken(t *testing.T) {
 	testSetup()
 
-	token := signedQueryToken("GET", path, 300, now)
+	token := signedQueryToken("GET", filePath, 300, now)
 
 	if token != expectedQueryToken {
 		t.Fatalf("incorrect token\nexpected:\n%s\n\ngot:\n%s", expectedQueryToken, token)
@@ -32,14 +32,14 @@ func TestS3SignedQueryToken(t *testing.T) {
 }
 
 func TestS3HeaderSignatureLocation(t *testing.T) {
-	sig := S3SignHeader("PUT", path, contentSha)
+	sig := S3SignHeader("PUT", filePath, contentSha)
 	if sig.Location != expectedLocation {
 		t.Fatalf("incorrect header location\nexpected:\n%s\n\ngot:\n%s", expectedLocation, sig.Location)
 	}
 }
 
 func TestS3QuerySignatureLocation(t *testing.T) {
-	sig := S3SignQuery("GET", path, 300)
+	sig := S3SignQuery("GET", filePath, 300)
 
 	u, err := url.Parse(sig.Location)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestS3QuerySignatureLocation(t *testing.T) {
 		t.Fatalf("incorrect url host\nexpected:\nexamplebucket.s3.amazonaws.com\n\ngot:\n%s", h)
 	}
 
-	dp, _ := url.QueryUnescape(path)
+	dp, _ := url.QueryUnescape(filePath)
 	if p := u.Path; p != dp {
 		t.Fatalf("incorrect url path\nexpected:\n%s\n\ngot:\n%s", dp, p)
 	}
