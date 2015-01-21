@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
 	"net/http"
 	"path"
 )
@@ -41,25 +40,28 @@ type appVars struct {
 }
 
 var (
-	router       *mux.Router
 	apiAuthError = errors.New("auth error")
 )
 
 func newRouter() http.Handler {
-	router = mux.NewRouter()
+	r := NewRouter()
 
-	o := router.PathPrefix("/{user}/{repo}/objects").Subrouter()
-	o.Methods("POST").Headers("Accept", metaMediaType).HandlerFunc(PostHandler)
-	o.Path("/{oid}").Methods("GET", "HEAD").Headers("Accept", contentMediaType).HandlerFunc(GetContentHandler).Name("download")
-	o.Path("/{oid}").Methods("GET", "HEAD").Headers("Accept", metaMediaType).HandlerFunc(GetMetaHandler)
-	o.Path("/{oid}").Methods("OPTIONS").Headers("Accept", contentMediaType).HandlerFunc(OptionsHandler)
-	o.Path("/{oid}").Methods("PUT").Headers("Accept", contentMediaType).HandlerFunc(PutHandler)
+	s := r.Route("/{user}/{repo}/objects/{oid}")
+	s.Get(contentMediaType, GetContentHandler)
+	s.Head(contentMediaType, GetContentHandler)
+	s.Get(metaMediaType, GetMetaHandler)
+	s.Head(metaMediaType, GetMetaHandler)
+	s.Options(contentMediaType, OptionsHandler)
+	s.Put(contentMediaType, PutHandler)
 
-	return router
+	o := r.Route("/{user}/{repo}/objects")
+	o.Post(metaMediaType, PostHandler)
+
+	return r
 }
 
-func GetContentHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
+func GetContentHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
+	av := unpack(v, r)
 	meta, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -73,8 +75,8 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 302)
 }
 
-func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
+func GetMetaHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
+	av := unpack(v, r)
 	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -91,8 +93,8 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
-func PostHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
+func PostHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
+	av := unpack(v, r)
 	m, err := SendMeta(av)
 
 	if err == apiAuthError {
@@ -120,8 +122,8 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 201)
 }
 
-func OptionsHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
+func OptionsHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
+	av := unpack(v, r)
 	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -143,7 +145,7 @@ func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
-func PutHandler(w http.ResponseWriter, r *http.Request) {
+func PutHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
 	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
@@ -239,8 +241,7 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
-func unpack(r *http.Request) *appVars {
-	vars := mux.Vars(r)
+func unpack(vars map[string]string, r *http.Request) *appVars {
 	av := &appVars{
 		User:          vars["user"],
 		Repo:          vars["repo"],
@@ -270,7 +271,7 @@ func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
 		Links: make(map[string]*link),
 	}
 
-	path, _ := router.Get("download").URLPath("user", v.User, "repo", v.Repo, "oid", m.Oid)
+	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, m.Oid)
 	meta.Links["download"] = &link{Href: fmt.Sprintf("https://%s%s", Config.Host, path)}
 	if upload {
 		meta.Links["upload"] = signedLink("PUT", m.PathPrefix, meta.Oid)
