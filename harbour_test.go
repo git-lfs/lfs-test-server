@@ -419,6 +419,28 @@ func TestMediaTypesRequired(t *testing.T) {
 	}
 }
 
+func TestMediaTypesParsed(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", contentMediaType + "; charset=utf-8")
+
+	res, err := http.DefaultTransport.RoundTrip(req) // Do not follow the redirect
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 302 {
+		t.Fatalf("expected status 302, got %d", res.StatusCode)
+	}
+}
+
+
 var (
 	now         time.Time
 	mediaServer *httptest.Server

@@ -62,7 +62,8 @@ func newRoute(pattern string) *Route {
 
 
 func (rt *Route) handle(w http.ResponseWriter, r *http.Request) bool {
-  mt := r.Header.Get("Accept") // remove anything after ;
+  mediaParts := strings.Split(r.Header.Get("Accept"), ";")
+  mt := mediaParts[0]
   h, ok := rt.handlers[mt+r.Method]
   if !ok {
     return false
