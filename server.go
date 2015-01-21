@@ -60,8 +60,8 @@ func newRouter() http.Handler {
 	return r
 }
 
-func GetContentHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
-	av := unpack(v, r)
+func GetContentHandler(w http.ResponseWriter, r *http.Request) {
+	av := unpack(r)
 	meta, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -75,8 +75,8 @@ func GetContentHandler(w http.ResponseWriter, r *http.Request, v map[string]stri
 	logRequest(r, 302)
 }
 
-func GetMetaHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
-	av := unpack(v, r)
+func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
+	av := unpack(r)
 	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -93,8 +93,8 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request, v map[string]string)
 	logRequest(r, 200)
 }
 
-func PostHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
-	av := unpack(v, r)
+func PostHandler(w http.ResponseWriter, r *http.Request) {
+	av := unpack(r)
 	m, err := SendMeta(av)
 
 	if err == apiAuthError {
@@ -122,8 +122,8 @@ func PostHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
 	logRequest(r, 201)
 }
 
-func OptionsHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
-	av := unpack(v, r)
+func OptionsHandler(w http.ResponseWriter, r *http.Request) {
+	av := unpack(r)
 	m, err := GetMeta(av)
 	if err != nil {
 		w.WriteHeader(404)
@@ -145,7 +145,7 @@ func OptionsHandler(w http.ResponseWriter, r *http.Request, v map[string]string)
 	logRequest(r, 200)
 }
 
-func PutHandler(w http.ResponseWriter, r *http.Request, v map[string]string) {
+func PutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
@@ -241,7 +241,8 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
-func unpack(vars map[string]string, r *http.Request) *appVars {
+func unpack(r *http.Request) *appVars {
+	vars := Vars(r)
 	av := &appVars{
 		User:          vars["user"],
 		Repo:          vars["repo"],
