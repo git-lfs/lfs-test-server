@@ -76,14 +76,11 @@ func (rt *Route) handle(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
-	// Extract path variables
 	parts := strings.Split(r.URL.Path, "/")
 	vars := make(map[string]string)
 	for name, pos := range rt.variables {
 		vars[name] = parts[pos]
 	}
-
-	// If it's a POST and +json, decode json vars
 
 	mutex.Lock()
 	rvars[r] = vars

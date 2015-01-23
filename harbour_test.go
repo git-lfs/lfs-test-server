@@ -87,7 +87,7 @@ func TestGetMetaAuthed(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://127.0.0.1/user/repo/objects/"+authedOid {
+	if download.Href != "https://127.0.0.1:8080/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 }

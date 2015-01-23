@@ -163,8 +163,35 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 
 func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	av := unpack(r)
-	logger.Printf("STARTING CALLBACK %v\n", av)
-	err := SendVerification(av)
+	m, err := GetMeta(av)
+	if err != nil {
+		w.WriteHeader(404)
+		logRequest(r, 404)
+		return
+	}
+
+	token := S3SignQuery("HEAD", path.Join("/", m.PathPrefix, oidPath(m.Oid)), 30)
+	req, err := http.NewRequest("HEAD", token.Location, nil)
+	if err != nil {
+		logRequest(r, 404)
+		w.WriteHeader(404)
+		return
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		logRequest(r, 404)
+		w.WriteHeader(404)
+		return
+	}
+
+	if res.StatusCode != 200 {
+		logRequest(r, 404)
+		w.WriteHeader(404)
+		return
+	}
+
+	err = SendVerification(av)
 
 	if err == apiAuthError {
 		logRequest(r, 403)
