@@ -43,6 +43,23 @@ type appVars struct {
 	Body          string
 }
 
+func (av *appVars) VerificationLink() string {
+	return Config.MetaEndpoint + "/" + path.Join(av.User, av.Repo, "media", "blobs", "verify", av.Oid)
+}
+
+func (av *appVars) MetaLink() string {
+	return Config.MetaEndpoint + "/" + path.Join(av.User, av.Repo, "media", "blobs", av.Oid)
+}
+
+func (av *appVars) S3Path() string {
+	return ""
+}
+
+func (av *appVars) ObjectLink() string {
+	path := fmt.Sprintf("/%s/%s/objects/%s", av.User, av.Repo, av.Oid)
+	return fmt.Sprintf("http://%s%s", Config.Host, path)
+}
+
 var (
 	apiAuthError = errors.New("auth error")
 )
@@ -212,9 +229,7 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", v.MetaLink(), nil)
 	if err != nil {
 		logger.Printf("[META] error - %s", err)
 		return nil, err
@@ -240,7 +255,7 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 			return nil, err
 		}
 
-		logger.Printf("[META] status - %d %v", res.StatusCode, m)
+		logger.Printf("[META] status - %d", res.StatusCode)
 		return &m, nil
 	}
 
@@ -249,26 +264,7 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 }
 
 func SendMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
-
-	req, err := http.NewRequest("POST", url, &buf)
-	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
-	}
-	req.Header.Set("Accept", Config.ApiMediaType)
-	if v.Authorization != "" {
-		req.Header.Set("Authorization", v.Authorization)
-	}
-
-	if Config.HmacKey != "" {
-		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
-		mac.Write(buf.Bytes())
-		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
-	}
+	req, err := signedApiPost(v.MetaLink(), v)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -302,25 +298,9 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 }
 
 func SendVerification(v *appVars) error {
-	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", "verify", v.Oid)
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
-
-	req, err := http.NewRequest("POST", url, &buf)
+	req, err := signedApiPost(v.VerificationLink(), v)
 	if err != nil {
-		logger.Printf("[VERIFY] error - %s", err)
 		return err
-	}
-	req.Header.Set("Accept", Config.ApiMediaType)
-	if v.Authorization != "" {
-		req.Header.Set("Authorization", v.Authorization)
-	}
-
-	if Config.HmacKey != "" {
-		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
-		mac.Write(buf.Bytes())
-		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
 	}
 
 	res, err := http.DefaultClient.Do(req)
@@ -376,16 +356,14 @@ func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
 		Links: make(map[string]*link),
 	}
 
-	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, m.Oid)
-	objectUrl := fmt.Sprintf("http://%s%s", Config.Host, path)
-	meta.Links["download"] = &link{Href: objectUrl}
+	meta.Links["download"] = &link{Href: v.ObjectLink()}
 	if upload {
 		meta.Links["upload"] = signedLink("PUT", m.PathPrefix, meta.Oid)
 
 		header := make(map[string]string)
 		header["Accept"] = metaMediaType
 		header["Authorization"] = v.Authorization
-		meta.Links["callback"] = &link{Href: objectUrl, Header: header}
+		meta.Links["callback"] = &link{Href: v.ObjectLink(), Header: header}
 	}
 	return meta
 }
@@ -398,6 +376,29 @@ func signedLink(method, pathPrefix, oid string) *link {
 	header["x-amz-date"] = token.Time.Format(isoLayout)
 
 	return &link{Href: token.Location, Header: header}
+}
+
+func signedApiPost(url string, v *appVars) (*http.Request, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
+
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", Config.ApiMediaType)
+	if v.Authorization != "" {
+		req.Header.Set("Authorization", v.Authorization)
+	}
+
+	if Config.HmacKey != "" {
+		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
+		mac.Write(buf.Bytes())
+		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
+	}
+
+	return req, nil
 }
 
 func oidPath(oid string) string {
