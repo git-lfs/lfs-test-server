@@ -162,14 +162,21 @@ func TestPostAuthedNewObject(t *testing.T) {
 
 	upload, ok := meta.Links["upload"]
 	if !ok {
-		t.Fatalf("expected upload link to be present")
+		t.Fatal("expected upload link to be present")
 	}
 
 	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(nonexistingOid) {
 		t.Fatalf("expected upload link, got %s", upload.Href)
 	}
 
-	// Check callback
+	callback, ok := meta.Links["callback"]
+	if !ok {
+		t.Fatal("expected callback link to be present")
+	}
+
+	if callback.Href != "https://127.0.0.1/user/repo/objects/"+nonexistingOid {
+		t.Fatalf("expected callback link, got %s", callback.Href)
+	}
 }
 
 func TestPostAuthedExistingObject(t *testing.T) {
@@ -397,6 +404,30 @@ func TestPut(t *testing.T) {
 	}
 }
 
+func TestCallbackWithSuccess(t *testing.T) {
+	testSetup()
+	defer testTeardown()
+
+	req, err := http.NewRequest("POST", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.Header.Set("Authorization", authedToken)
+	req.Header.Set("Accept", metaMediaType)
+
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "status":200, "body":"ok"}`, authedOid))
+	req.Body = ioutil.NopCloser(buf)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
+	}
+}
+
 func TestMediaTypesRequired(t *testing.T) {
 	testSetup()
 	defer testTeardown()
@@ -428,7 +459,7 @@ func TestMediaTypesParsed(t *testing.T) {
 		t.Fatalf("request error: %s", err)
 	}
 	req.Header.Set("Authorization", authedToken)
-	req.Header.Set("Accept", contentMediaType + "; charset=utf-8")
+	req.Header.Set("Accept", contentMediaType+"; charset=utf-8")
 
 	res, err := http.DefaultTransport.RoundTrip(req) // Do not follow the redirect
 	if err != nil {
@@ -439,7 +470,6 @@ func TestMediaTypesParsed(t *testing.T) {
 		t.Fatalf("expected status 302, got %d", res.StatusCode)
 	}
 }
-
 
 var (
 	now         time.Time

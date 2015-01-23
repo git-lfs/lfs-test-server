@@ -12,12 +12,19 @@ import (
 	"path"
 )
 
+// Meta is the external representation
 type Meta struct {
 	Oid   string           `json:"oid"`
 	Size  int64            `json:"size"`
 	Links map[string]*link `json:"_links,omitempty"`
 }
 
+type link struct {
+	Href   string            `json:"href"`
+	Header map[string]string `json:"header,omitempty"`
+}
+
+// apiMeta is the internal representation
 type apiMeta struct {
 	Oid        string `json:"oid"`
 	Size       int64  `json:"size"`
@@ -26,17 +33,14 @@ type apiMeta struct {
 	existing   bool   `json:"-"`
 }
 
-type link struct {
-	Href   string            `json:"href"`
-	Header map[string]string `json:"header,omitempty"`
-}
-
 type appVars struct {
 	User          string
 	Repo          string
 	Oid           string
 	Size          int64
 	Authorization string
+	Status        int
+	Body          string
 }
 
 var (
@@ -53,6 +57,7 @@ func newRouter() http.Handler {
 	s.Head(metaMediaType, GetMetaHandler)
 	s.Options(contentMediaType, OptionsHandler)
 	s.Put(contentMediaType, PutHandler)
+	s.Post(metaMediaType, CallbackHandler)
 
 	o := r.Route("/{user}/{repo}/objects")
 	o.Post(metaMediaType, PostHandler)
@@ -87,9 +92,12 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	meta := newMeta(m, av, false)
-	enc := json.NewEncoder(w)
-	enc.Encode(meta)
+	if r.Method == "GET" {
+		meta := newMeta(m, av, false)
+		enc := json.NewEncoder(w)
+		enc.Encode(meta)
+	}
+
 	logRequest(r, 200)
 }
 
@@ -112,14 +120,16 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
+	sentStatus := 200
 	if !m.existing {
+		sentStatus = 201
 		w.WriteHeader(201)
 	}
 
 	meta := newMeta(m, av, true)
 	enc := json.NewEncoder(w)
 	enc.Encode(meta)
-	logRequest(r, 201)
+	logRequest(r, sentStatus)
 }
 
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +161,29 @@ func PutHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 405)
 }
 
+func CallbackHandler(w http.ResponseWriter, r *http.Request) {
+	av := unpack(r)
+	logger.Printf("STARTING CALLBACK %v\n", av)
+	err := SendVerification(av)
+
+	if err == apiAuthError {
+		logRequest(r, 403)
+		w.WriteHeader(403)
+		return
+	}
+
+	if err != nil {
+		w.WriteHeader(404)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+		logRequest(r, 404)
+		return
+	}
+
+	w.Header().Set("Content-Type", metaMediaType)
+	fmt.Fprint(w, `{"message":"ok"}`)
+	logRequest(r, 200)
+}
+
 func GetMeta(v *appVars) (*apiMeta, error) {
 	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
 
@@ -180,7 +213,7 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 			return nil, err
 		}
 
-		logger.Printf("[META] status - %d", res.StatusCode)
+		logger.Printf("[META] status - %d %v", res.StatusCode, m)
 		return &m, nil
 	}
 
@@ -190,7 +223,6 @@ func GetMeta(v *appVars) (*apiMeta, error) {
 
 func SendMeta(v *appVars) (*apiMeta, error) {
 	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
-
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
@@ -220,6 +252,7 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode == 403 {
+		logger.Printf("[META] 403")
 		return nil, apiAuthError
 	}
 
@@ -241,6 +274,48 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
+func SendVerification(v *appVars) error {
+	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", "verify", v.Oid)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
+
+	req, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		logger.Printf("[VERIFY] error - %s", err)
+		return err
+	}
+	req.Header.Set("Accept", Config.ApiMediaType)
+	if v.Authorization != "" {
+		req.Header.Set("Authorization", v.Authorization)
+	}
+
+	if Config.HmacKey != "" {
+		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
+		mac.Write(buf.Bytes())
+		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		logger.Printf("[VERIFY] error - %s", err)
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode == 403 {
+		logger.Printf("[VERIFY] 403")
+		return apiAuthError
+	}
+
+	logger.Printf("[VERIFY] status - %d", res.StatusCode)
+	if res.StatusCode == 200 {
+		return nil
+	}
+	return fmt.Errorf("status: %d", res.StatusCode)
+}
+
 func unpack(r *http.Request) *appVars {
 	vars := Vars(r)
 	av := &appVars{
@@ -250,7 +325,7 @@ func unpack(r *http.Request) *appVars {
 		Authorization: r.Header.Get("Authorization"),
 	}
 
-	if r.Method == "POST" {
+	if r.Method == "POST" { // Maybe also check if +json
 		var m appVars
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&m)
@@ -260,6 +335,8 @@ func unpack(r *http.Request) *appVars {
 
 		av.Oid = m.Oid
 		av.Size = m.Size
+		av.Status = m.Status
+		av.Body = m.Body
 	}
 
 	return av
@@ -273,10 +350,15 @@ func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
 	}
 
 	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, m.Oid)
-	meta.Links["download"] = &link{Href: fmt.Sprintf("https://%s%s", Config.Host, path)}
+	objectUrl := fmt.Sprintf("http://%s%s", Config.Host, path)
+	meta.Links["download"] = &link{Href: objectUrl}
 	if upload {
 		meta.Links["upload"] = signedLink("PUT", m.PathPrefix, meta.Oid)
-		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
+
+		header := make(map[string]string)
+		header["Accept"] = metaMediaType
+		header["Authorization"] = v.Authorization
+		meta.Links["callback"] = &link{Href: objectUrl, Header: header}
 	}
 	return meta
 }
@@ -292,6 +374,7 @@ func signedLink(method, pathPrefix, oid string) *link {
 }
 
 func oidPath(oid string) string {
+	// TODO verify oid length
 	dir := path.Join(oid[0:2], oid[2:4])
 
 	return path.Join("/", dir, oid)

@@ -14,7 +14,7 @@ type Configuration struct {
 	AwsRegion    string `config:"us-east-1"`
 	MetaEndpoint string
 	Address      string `config:"tcp4://127.0.0.1:8080"`
-	Host         string `config:"127.0.0.1"`
+	Host         string `config:"127.0.0.1:8080"`
 	ApiMediaType string `config:"application/vnd.test-api+json"`
 	HmacKey      string
 }
