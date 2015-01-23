@@ -87,7 +87,7 @@ func TestGetMetaAuthed(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://127.0.0.1:8080/user/repo/objects/"+authedOid {
+	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 }
@@ -156,7 +156,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://127.0.0.1/user/repo/objects/"+nonexistingOid {
+	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
@@ -174,7 +174,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatal("expected callback link to be present")
 	}
 
-	if callback.Href != "https://127.0.0.1/user/repo/objects/"+nonexistingOid {
+	if callback.Href != "http://127.0.0.1:8080/user/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected callback link, got %s", callback.Href)
 	}
 }
@@ -215,7 +215,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "https://127.0.0.1/user/repo/objects/"+authedOid {
+	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
@@ -227,8 +227,6 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
 		t.Fatalf("expected upload link, got %s", upload.Href)
 	}
-
-	// Check callback
 }
 
 func TestPostAuthedReadOnly(t *testing.T) {
@@ -317,48 +315,6 @@ func TestOptionsNonExistingObject(t *testing.T) {
 
 	if res.StatusCode != 204 {
 		t.Fatalf("expected status code 204, got %d", res.StatusCode)
-	}
-}
-
-func TestOptionsReadOnlyExistingObject(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/readonly/objects/"+authedOid, nil)
-	if err != nil {
-		t.Fatalf("request error: %s", err)
-	}
-	req.Header.Set("Authorization", authedToken)
-	req.Header.Set("Accept", contentMediaType)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("response error: %s", err)
-	}
-
-	if res.StatusCode != 403 {
-		t.Fatalf("expected status code 403, got %d", res.StatusCode)
-	}
-}
-
-func TestOptionsReadOnlyNonExistingObject(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("OPTIONS", mediaServer.URL+"/user/readonly/objects/"+nonexistingOid, nil)
-	if err != nil {
-		t.Fatalf("request error: %s", err)
-	}
-	req.Header.Set("Authorization", authedToken)
-	req.Header.Set("Accept", contentMediaType)
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("response error: %s", err)
-	}
-
-	if res.StatusCode != 403 {
-		t.Fatalf("expected status code 403, got %d", res.StatusCode)
 	}
 }
 
@@ -486,6 +442,7 @@ func testSetup() {
 	Config.AwsKey = "AKIAIOSFODNN7EXAMPLE"
 	Config.AwsSecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 	Config.AwsBucket = "examplebucket"
+	Config.Scheme = "http"
 
 	contentSha = sha256Hex([]byte(content))
 	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
@@ -504,7 +461,7 @@ func testTeardown() {
 
 func newMetaServer() http.Handler {
 	router := mux.NewRouter()
-	s := router.Path("/internal/repos/{user}/{repo}/media/blobs/{oid}").Subrouter()
+	s := router.Path("/{user}/{repo}/media/blobs/{oid}").Subrouter()
 
 	s.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authz := r.Header.Get("Authorization")

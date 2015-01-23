@@ -17,6 +17,7 @@ type Configuration struct {
 	Host         string `config:"127.0.0.1:8080"`
 	ApiMediaType string `config:"application/vnd.test-api+json"`
 	HmacKey      string
+	Scheme       string `config:"https"`
 }
 
 var Config = &Configuration{}

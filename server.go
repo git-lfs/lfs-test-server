@@ -28,7 +28,6 @@ type link struct {
 type apiMeta struct {
 	Oid        string `json:"oid"`
 	Size       int64  `json:"size"`
-	Writeable  bool   `json:"writeable"`
 	PathPrefix string `json:"path_prefix"`
 	existing   bool   `json:"-"`
 }
@@ -57,7 +56,7 @@ func (av *appVars) S3Path() string {
 
 func (av *appVars) ObjectLink() string {
 	path := fmt.Sprintf("/%s/%s/objects/%s", av.User, av.Repo, av.Oid)
-	return fmt.Sprintf("http://%s%s", Config.Host, path)
+	return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
 }
 
 var (
@@ -152,15 +151,16 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	av := unpack(r)
 	m, err := GetMeta(av)
-	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
+
+	if err == apiAuthError {
+		logRequest(r, 403)
+		w.WriteHeader(403)
 		return
 	}
 
-	if !m.Writeable {
-		w.WriteHeader(403)
-		logRequest(r, 403)
+	if err != nil {
+		w.WriteHeader(404)
+		logRequest(r, 404)
 		return
 	}
 
@@ -287,7 +287,6 @@ func SendMeta(v *appVars) (*apiMeta, error) {
 			logger.Printf("[META] error - %s", err)
 			return nil, err
 		}
-		m.Writeable = true // Probably remove this
 		m.existing = res.StatusCode == 200
 		logger.Printf("[META] status - %d", res.StatusCode)
 		return &m, nil
