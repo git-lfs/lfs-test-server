@@ -11,15 +11,22 @@ import (
 	"path"
 )
 
+// S3Redirector implements the ContentStorer interface to serve content via redirecting to S3.
 type S3Redirector struct {
 }
 
+// Get will use the provided object Meta data to write a redirect Location and status to
+// the Response Writer. It generates a signed S3 URL that is valid for 5 minutes.
 func (s *S3Redirector) Get(meta *Meta, w http.ResponseWriter, r *http.Request) int {
-	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
+	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 300)
 	w.Header().Set("Location", token.Location)
+	w.WriteHeader(302)
 	return 302
 }
 
+// PutLink generates an signed S3 link that will allow the client to PUT data into S3. This
+// link includes the x-amz-content-sha256 header which will ensure that the client uploads only
+// data that will match the OID.
 func (s *S3Redirector) PutLink(meta *Meta) *link {
 	token := S3SignHeader("PUT", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), meta.Oid)
 	header := make(map[string]string)
@@ -30,7 +37,8 @@ func (s *S3Redirector) PutLink(meta *Meta) *link {
 	return &link{Href: token.Location, Header: header}
 }
 
-func (s *S3Redirector) Verify(meta *Meta) (bool, error) {
+// Exists checks to see if an object exists on S3.
+func (s *S3Redirector) Exists(meta *Meta) (bool, error) {
 	token := S3SignQuery("HEAD", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 30)
 	req, err := http.NewRequest("HEAD", token.Location, nil)
 	if err != nil {
@@ -55,13 +63,16 @@ func oidPath(oid string) string {
 	return path.Join("/", dir, oid)
 }
 
+// MetaStore implements the MetaStorer interface to provide metadata from an external HTTP API.
 type MetaStore struct {
 }
 
+// MetaLink generates a URI path using the configured MetaEndpoint.
 func (s *MetaStore) MetaLink(v *RequestVars) string {
 	return Config.MetaEndpoint + "/" + path.Join(v.User, v.Repo, "media", "blobs", v.Oid)
 }
 
+// Get retrieves metadata from the backend API.
 func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	req, err := http.NewRequest("GET", s.MetaLink(v), nil)
 	if err != nil {
@@ -101,6 +112,7 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
+// Send POSTs metadata to the backend API.
 func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 	req, err := signedApiPost(s.MetaLink(v), v)
 
@@ -134,6 +146,8 @@ func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
+// Verify is used during the callback phase to indicate to the backend API that the
+// object has been received.
 func (s *MetaStore) Verify(v *RequestVars) error {
 	url := Config.MetaEndpoint + "/" + path.Join(v.User, v.Repo, "media", "blobs", "verify", v.Oid)
 

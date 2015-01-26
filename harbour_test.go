@@ -466,6 +466,7 @@ type TestRedirector struct {
 func (t *TestRedirector) Get(meta *Meta, w http.ResponseWriter, r *http.Request) int {
 	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
 	w.Header().Set("Location", token.Location)
+	w.WriteHeader(302)
 	return 302
 }
 
@@ -479,7 +480,7 @@ func (t *TestRedirector) PutLink(meta *Meta) *link {
 	return &link{Href: token.Location, Header: header}
 }
 
-func (t *TestRedirector) Verify(*Meta) (bool, error) {
+func (t *TestRedirector) Exists(*Meta) (bool, error) {
 	return true, nil
 }
 
