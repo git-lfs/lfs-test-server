@@ -287,5 +287,5 @@ func unpack(r *http.Request) *RequestVars {
 }
 
 func logRequest(r *http.Request, status int) {
-	logger.Printf("[%s] %s - %d", r.Method, r.URL, status)
+	logger.Log(D{"method": r.Method, "url": r.URL, "status": status})
 }

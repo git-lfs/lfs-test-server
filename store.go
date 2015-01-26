@@ -76,7 +76,7 @@ func (s *MetaStore) MetaLink(v *RequestVars) string {
 func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	req, err := http.NewRequest("GET", s.MetaLink(v), nil)
 	if err != nil {
-		logger.Printf("[META] error - %s", err)
+		logger.Log(D{"fn": "meta.Get", "err": err})
 		return nil, err
 	}
 	req.Header.Set("Accept", Config.ApiMediaType)
@@ -86,7 +86,7 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Printf("[META] error - %s", err)
+		logger.Log(D{"fn": "meta.Get", "err": err})
 		return nil, err
 	}
 
@@ -96,11 +96,11 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 		dec := json.NewDecoder(res.Body)
 		err := dec.Decode(&m)
 		if err != nil {
-			logger.Printf("[META] error - %s", err)
+			logger.Log(D{"fn": "meta.Get", "err": err})
 			return nil, err
 		}
 
-		logger.Printf("[META] status - %d", res.StatusCode)
+		logger.Log(D{"fn": "meta.Get", "status": res.StatusCode})
 		return &m, nil
 	}
 
@@ -108,7 +108,7 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 		return &Meta{Oid: v.Oid, Size: v.Size, PathPrefix: v.PathPrefix}, nil
 	}
 
-	logger.Printf("[META] status - %d", res.StatusCode)
+	logger.Log(D{"fn": "meta.Get", "status": res.StatusCode})
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
@@ -118,14 +118,14 @@ func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Printf("[META] error - %s", err)
+		logger.Log(D{"fn": "meta.Send", "err": err})
 		return nil, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode == 403 {
-		logger.Printf("[META] 403")
+		logger.Log(D{"fn": "meta.Send", "status": 403})
 		return nil, apiAuthError
 	}
 
@@ -134,15 +134,15 @@ func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 		dec := json.NewDecoder(res.Body)
 		err := dec.Decode(&m)
 		if err != nil {
-			logger.Printf("[META] error - %s", err)
+			logger.Log(D{"fn": "meta.Send", "err": err})
 			return nil, err
 		}
 		m.existing = res.StatusCode == 200
-		logger.Printf("[META] status - %d", res.StatusCode)
+		logger.Log(D{"fn": "meta.Send", "status": res.StatusCode})
 		return &m, nil
 	}
 
-	logger.Printf("[META] status - %d", res.StatusCode)
+	logger.Log(D{"fn": "meta.Send", "status": res.StatusCode})
 	return nil, fmt.Errorf("status: %d", res.StatusCode)
 }
 
@@ -158,18 +158,18 @@ func (s *MetaStore) Verify(v *RequestVars) error {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Printf("[VERIFY] error - %s", err)
+		logger.Log(D{"fn": "meta.Verify", "err": err})
 		return err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode == 403 {
-		logger.Printf("[VERIFY] 403")
+		logger.Log(D{"fn": "meta.Verify", "err": 403})
 		return apiAuthError
 	}
 
-	logger.Printf("[VERIFY] status - %d", res.StatusCode)
+	logger.Log(D{"fn": "meta.Verify", "status": res.StatusCode})
 	if res.StatusCode == 200 {
 		return nil
 	}

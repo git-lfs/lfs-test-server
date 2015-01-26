@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -452,7 +451,7 @@ func testSetup() {
 	metaServer = httptest.NewServer(newMetaServer())
 	Config.MetaEndpoint = metaServer.URL
 
-	logger = log.New(ioutil.Discard, "", log.LstdFlags)
+	logger = NewKVLogger(ioutil.Discard)
 }
 
 func testTeardown() {
