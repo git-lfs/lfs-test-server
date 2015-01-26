@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"testing"
 	"time"
 )
@@ -74,7 +74,7 @@ func TestGetMetaAuthed(t *testing.T) {
 		t.Fatalf("expected status 200, got %d %s", res.StatusCode, req.URL)
 	}
 
-	var meta Meta
+	var meta Representation
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&meta)
 
@@ -143,7 +143,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatalf("expected status 201, got %d", res.StatusCode)
 	}
 
-	var meta Meta
+	var meta Representation
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&meta)
 
@@ -202,7 +202,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 
-	var meta Meta
+	var meta Representation
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&meta)
 
@@ -447,7 +447,8 @@ func testSetup() {
 	contentSha = sha256Hex([]byte(content))
 	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
 
-	mediaServer = httptest.NewServer(newRouter())
+	app := NewApp(&TestRedirector{}, &MetaStore{})
+	mediaServer = httptest.NewServer(app.Router)
 	metaServer = httptest.NewServer(newMetaServer())
 	Config.MetaEndpoint = metaServer.URL
 
@@ -459,18 +460,41 @@ func testTeardown() {
 	metaServer.Close()
 }
 
-func newMetaServer() http.Handler {
-	router := mux.NewRouter()
-	s := router.Path("/{user}/{repo}/media/blobs/{oid}").Subrouter()
+type TestRedirector struct {
+}
 
-	s.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (t *TestRedirector) Get(meta *Meta, w http.ResponseWriter, r *http.Request) int {
+	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
+	w.Header().Set("Location", token.Location)
+	return 302
+}
+
+func (t *TestRedirector) PutLink(meta *Meta) *link {
+	token := S3SignHeader("PUT", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), meta.Oid)
+	header := make(map[string]string)
+	header["Authorization"] = token.Token
+	header["x-amz-content-sha256"] = meta.Oid
+	header["x-amz-date"] = token.Time.Format(isoLayout)
+
+	return &link{Href: token.Location, Header: header}
+}
+
+func (t *TestRedirector) Verify(*Meta) (bool, error) {
+	return true, nil
+}
+
+func newMetaServer() http.Handler {
+	router := NewRouter()
+	s := router.Route("/{user}/{repo}/media/blobs/{oid}")
+
+	s.Get(Config.ApiMediaType, func(w http.ResponseWriter, r *http.Request) {
 		authz := r.Header.Get("Authorization")
 		if authz != authedToken {
 			w.WriteHeader(404)
 			return
 		}
 
-		vars := mux.Vars(r)
+		vars := Vars(r)
 		oid := vars["oid"]
 		repo := vars["repo"]
 
@@ -489,17 +513,17 @@ func newMetaServer() http.Handler {
 		}
 	})
 
-	s.Methods("POST").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.Post(Config.ApiMediaType, func(w http.ResponseWriter, r *http.Request) {
 		authz := r.Header.Get("Authorization")
 		if authz != authedToken {
 			w.WriteHeader(404)
 			return
 		}
 
-		vars := mux.Vars(r)
+		vars := Vars(r)
 		repo := vars["repo"]
 
-		var m apiMeta
+		var m Representation
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&m)
 		if err != nil {
