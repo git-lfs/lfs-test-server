@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -80,6 +82,12 @@ func (rt *Route) handle(w http.ResponseWriter, r *http.Request) bool {
 	vars := make(map[string]string)
 	for name, pos := range rt.variables {
 		vars[name] = parts[pos]
+	}
+
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err == nil {
+		vars["request_id"] = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	}
 
 	mutex.Lock()

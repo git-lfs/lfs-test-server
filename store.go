@@ -83,6 +83,9 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	if v.Authorization != "" {
 		req.Header.Set("Authorization", v.Authorization)
 	}
+	if v.RequestId != "" {
+		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
+	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -115,6 +118,10 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 // Send POSTs metadata to the backend API.
 func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 	req, err := signedApiPost(s.MetaLink(v), v)
+
+	if v.RequestId != "" {
+		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
+	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -154,6 +161,9 @@ func (s *MetaStore) Verify(v *RequestVars) error {
 	req, err := signedApiPost(url, v)
 	if err != nil {
 		return err
+	}
+	if v.RequestId != "" {
+		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
 	}
 
 	res, err := http.DefaultClient.Do(req)

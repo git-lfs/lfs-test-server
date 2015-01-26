@@ -44,6 +44,7 @@ type RequestVars struct {
 	PathPrefix    string
 	Status        int64
 	Body          string
+	RequestId     string
 }
 
 // Meta is object metadata as seen by the object and metadata stores.
@@ -267,6 +268,7 @@ func unpack(r *http.Request) *RequestVars {
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
 		PathPrefix:    r.Header.Get("PathPrefix"),
+		RequestId:     vars["request_id"],
 	}
 
 	if r.Method == "POST" { // Maybe also check if +json
@@ -287,5 +289,5 @@ func unpack(r *http.Request) *RequestVars {
 }
 
 func logRequest(r *http.Request, status int) {
-	logger.Log(D{"method": r.Method, "url": r.URL, "status": status})
+	logger.Log(D{"method": r.Method, "url": r.URL, "status": status, "request_id": Vars(r)["request_id"]})
 }
