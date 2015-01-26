@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -72,6 +71,8 @@ func main() {
 
 	baseUrl = fmt.Sprintf("http://%s", tl.Addr())
 	logger.Printf("[%d] Listening on %s (http://%s)", os.Getpid(), Config.Address, baseUrl)
-	http.Serve(tl, newRouter())
+
+	app := NewApp(&S3Redirector{}, &MetaStore{})
+	app.Serve(tl)
 	tl.WaitForChildren()
 }

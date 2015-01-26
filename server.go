@@ -1,29 +1,52 @@
 package main
 
 import (
-	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	"path"
 )
 
-type Meta struct {
-	Oid   string           `json:"oid"`
-	Size  int64            `json:"size"`
-	Links map[string]*link `json:"_links,omitempty"`
+type ContentStorer interface {
+	Get(*Meta, http.ResponseWriter, *http.Request) int
+	PutLink(*Meta) *link
+	Verify(*Meta) (bool, error)
 }
 
-type apiMeta struct {
+type MetaStorer interface {
+	Get(*RequestVars) (*Meta, error)
+	Send(*RequestVars) (*Meta, error)
+	Verify(*RequestVars) error
+}
+
+type RequestVars struct {
+	Oid           string
+	Size          int64
+	User          string
+	Repo          string
+	Authorization string
+	PathPrefix    string
+	Status        int64
+	Body          string
+}
+
+type Meta struct {
 	Oid        string `json:"oid"`
 	Size       int64  `json:"size"`
-	Writeable  bool   `json:"writeable"`
 	PathPrefix string `json:"path_prefix"`
-	existing   bool   `json:"-"`
+	existing   bool
+}
+
+type Representation struct {
+	Oid   string
+	Size  int64
+	Links map[string]*link `json:"_links"`
+}
+
+func (v *RequestVars) ObjectLink() string {
+	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, v.Oid)
+	return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
 }
 
 type link struct {
@@ -31,53 +54,60 @@ type link struct {
 	Header map[string]string `json:"header,omitempty"`
 }
 
-type appVars struct {
-	User          string
-	Repo          string
-	Oid           string
-	Size          int64
-	Authorization string
-}
-
 var (
 	apiAuthError = errors.New("auth error")
 )
 
-func newRouter() http.Handler {
+type App struct {
+	Router       *Router
+	ContentStore ContentStorer
+	MetaStore    MetaStorer
+}
+
+func NewApp(content ContentStorer, meta MetaStorer) *App {
+	app := &App{ContentStore: content, MetaStore: meta}
+
 	r := NewRouter()
 
 	s := r.Route("/{user}/{repo}/objects/{oid}")
-	s.Get(contentMediaType, GetContentHandler)
-	s.Head(contentMediaType, GetContentHandler)
-	s.Get(metaMediaType, GetMetaHandler)
-	s.Head(metaMediaType, GetMetaHandler)
-	s.Options(contentMediaType, OptionsHandler)
-	s.Put(contentMediaType, PutHandler)
+	s.Get(contentMediaType, app.GetContentHandler)
+	s.Head(contentMediaType, app.GetContentHandler)
+	s.Get(metaMediaType, app.GetMetaHandler)
+	s.Head(metaMediaType, app.GetMetaHandler)
+	s.Options(contentMediaType, app.OptionsHandler)
+	s.Put(contentMediaType, app.PutHandler)
+	s.Post(metaMediaType, app.CallbackHandler)
 
 	o := r.Route("/{user}/{repo}/objects")
-	o.Post(metaMediaType, PostHandler)
+	o.Post(metaMediaType, app.PostHandler)
 
-	return r
+	app.Router = r
+
+	return app
 }
 
-func GetContentHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
-	meta, err := GetMeta(av)
+func (a *App) Serve(l net.Listener) error {
+	return http.Serve(l, a.Router)
+}
+
+func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
+	rv := unpack(r)
+	meta, err := a.MetaStore.Get(rv)
 	if err != nil {
 		w.WriteHeader(404)
 		logRequest(r, 404)
 		return
 	}
 
-	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
-	w.Header().Set("Location", token.Location)
-	w.WriteHeader(302)
-	logRequest(r, 302)
+	status := a.ContentStore.Get(meta, w, r)
+
+	w.WriteHeader(status)
+	logRequest(r, status)
 }
 
-func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
-	m, err := GetMeta(av)
+func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
+	rv := unpack(r)
+	meta, err := a.MetaStore.Get(rv)
 	if err != nil {
 		w.WriteHeader(404)
 		fmt.Fprint(w, `{"message":"Not Found"}`)
@@ -87,15 +117,17 @@ func GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	meta := newMeta(m, av, false)
-	enc := json.NewEncoder(w)
-	enc.Encode(meta)
+	if r.Method == "GET" {
+		enc := json.NewEncoder(w)
+		enc.Encode(a.Represent(rv, meta, false))
+	}
+
 	logRequest(r, 200)
 }
 
-func PostHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
-	m, err := SendMeta(av)
+func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
+	rv := unpack(r)
+	meta, err := a.MetaStore.Send(rv)
 
 	if err == apiAuthError {
 		logRequest(r, 403)
@@ -112,28 +144,30 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	if !m.existing {
+	sentStatus := 200
+	if !meta.existing {
+		sentStatus = 201
 		w.WriteHeader(201)
 	}
 
-	meta := newMeta(m, av, true)
 	enc := json.NewEncoder(w)
-	enc.Encode(meta)
-	logRequest(r, 201)
+	enc.Encode(a.Represent(rv, meta, true))
+	logRequest(r, sentStatus)
 }
 
-func OptionsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *App) OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	av := unpack(r)
-	m, err := GetMeta(av)
-	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
+	m, err := a.MetaStore.Get(av)
+
+	if err == apiAuthError {
+		logRequest(r, 403)
+		w.WriteHeader(403)
 		return
 	}
 
-	if !m.Writeable {
-		w.WriteHeader(403)
-		logRequest(r, 403)
+	if err != nil {
+		w.WriteHeader(404)
+		logRequest(r, 404)
 		return
 	}
 
@@ -145,156 +179,94 @@ func OptionsHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
-func PutHandler(w http.ResponseWriter, r *http.Request) {
+func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
 }
 
-func GetMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
+func (a *App) CallbackHandler(w http.ResponseWriter, r *http.Request) {
+	rv := unpack(r)
 
-	req, err := http.NewRequest("GET", url, nil)
+	meta, err := a.MetaStore.Get(rv)
 	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
-	}
-	req.Header.Set("Accept", Config.ApiMediaType)
-	if v.Authorization != "" {
-		req.Header.Set("Authorization", v.Authorization)
+		w.WriteHeader(404)
+		logRequest(r, 404)
+		return
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	ok, err := a.ContentStore.Verify(meta)
+	if !ok || err != nil {
+		logRequest(r, 404) // Probably need to log an error
+		w.WriteHeader(404)
+		return
+	}
+
+	err = a.MetaStore.Verify(rv)
+
+	if err == apiAuthError {
+		logRequest(r, 403)
+		w.WriteHeader(403)
+		return
+	}
+
 	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
+		w.WriteHeader(404)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+		logRequest(r, 404)
+		return
 	}
 
-	defer res.Body.Close()
-	if res.StatusCode == 200 {
-		var m apiMeta
-		dec := json.NewDecoder(res.Body)
-		err := dec.Decode(&m)
-		if err != nil {
-			logger.Printf("[META] error - %s", err)
-			return nil, err
-		}
-
-		logger.Printf("[META] status - %d", res.StatusCode)
-		return &m, nil
-	}
-
-	logger.Printf("[META] status - %d", res.StatusCode)
-	return nil, fmt.Errorf("status: %d", res.StatusCode)
+	w.Header().Set("Content-Type", metaMediaType)
+	fmt.Fprint(w, `{"message":"ok"}`)
+	logRequest(r, 200)
 }
 
-func SendMeta(v *appVars) (*apiMeta, error) {
-	url := Config.MetaEndpoint + "/" + path.Join("internal/repos", v.User, v.Repo, "media", "blobs", v.Oid)
-
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.Encode(&apiMeta{Oid: v.Oid, Size: v.Size})
-
-	req, err := http.NewRequest("POST", url, &buf)
-	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
-	}
-	req.Header.Set("Accept", Config.ApiMediaType)
-	if v.Authorization != "" {
-		req.Header.Set("Authorization", v.Authorization)
+func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representation {
+	rep := &Representation{
+		Oid:   meta.Oid,
+		Size:  meta.Size,
+		Links: make(map[string]*link),
 	}
 
-	if Config.HmacKey != "" {
-		mac := hmac.New(sha256.New, []byte(Config.HmacKey))
-		mac.Write(buf.Bytes())
-		req.Header.Set("Content-Hmac", "sha256 "+hex.EncodeToString(mac.Sum(nil)))
+	rep.Links["download"] = &link{Href: rv.ObjectLink()}
+	if upload {
+		rep.Links["upload"] = a.ContentStore.PutLink(meta)
+
+		header := make(map[string]string)
+		header["Accept"] = metaMediaType
+		header["Authorization"] = rv.Authorization
+		header["PathPrefix"] = meta.PathPrefix
+		rep.Links["callback"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		logger.Printf("[META] error - %s", err)
-		return nil, err
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode == 403 {
-		return nil, apiAuthError
-	}
-
-	if res.StatusCode == 200 || res.StatusCode == 201 {
-		var m apiMeta
-		dec := json.NewDecoder(res.Body)
-		err := dec.Decode(&m)
-		if err != nil {
-			logger.Printf("[META] error - %s", err)
-			return nil, err
-		}
-		m.Writeable = true // Probably remove this
-		m.existing = res.StatusCode == 200
-		logger.Printf("[META] status - %d", res.StatusCode)
-		return &m, nil
-	}
-
-	logger.Printf("[META] status - %d", res.StatusCode)
-	return nil, fmt.Errorf("status: %d", res.StatusCode)
+	return rep
 }
 
-func unpack(r *http.Request) *appVars {
+func unpack(r *http.Request) *RequestVars {
 	vars := Vars(r)
-	av := &appVars{
+	rv := &RequestVars{
 		User:          vars["user"],
 		Repo:          vars["repo"],
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
+		PathPrefix:    r.Header.Get("PathPrefix"),
 	}
 
-	if r.Method == "POST" {
-		var m appVars
+	if r.Method == "POST" { // Maybe also check if +json
+		var p RequestVars
 		dec := json.NewDecoder(r.Body)
-		err := dec.Decode(&m)
+		err := dec.Decode(&p)
 		if err != nil {
-			return av
+			return rv
 		}
 
-		av.Oid = m.Oid
-		av.Size = m.Size
+		rv.Oid = p.Oid
+		rv.Size = p.Size
+		rv.Status = p.Status
+		rv.Body = p.Body
 	}
 
-	return av
-}
-
-func newMeta(m *apiMeta, v *appVars, upload bool) *Meta {
-	meta := &Meta{
-		Oid:   m.Oid,
-		Size:  m.Size,
-		Links: make(map[string]*link),
-	}
-
-	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, m.Oid)
-	meta.Links["download"] = &link{Href: fmt.Sprintf("https://%s%s", Config.Host, path)}
-	if upload {
-		meta.Links["upload"] = signedLink("PUT", m.PathPrefix, meta.Oid)
-		meta.Links["callback"] = &link{Href: "http://example.com/callmemaybe"}
-	}
-	return meta
-}
-
-func signedLink(method, pathPrefix, oid string) *link {
-	token := S3SignHeader(method, path.Join("/", pathPrefix, oidPath(oid)), oid)
-	header := make(map[string]string)
-	header["Authorization"] = token.Token
-	header["x-amz-content-sha256"] = oid
-	header["x-amz-date"] = token.Time.Format(isoLayout)
-
-	return &link{Href: token.Location, Header: header}
-}
-
-func oidPath(oid string) string {
-	dir := path.Join(oid[0:2], oid[2:4])
-
-	return path.Join("/", dir, oid)
+	return rv
 }
 
 func logRequest(r *http.Request, status int) {
