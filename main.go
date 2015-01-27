@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	logger  = log.New(os.Stdout, "harbour:", log.LstdFlags)
+	logger  = NewKVLogger(os.Stdout)
 	baseUrl string
 )
 
@@ -70,7 +70,7 @@ func main() {
 	}(c, tl)
 
 	baseUrl = fmt.Sprintf("http://%s", tl.Addr())
-	logger.Printf("[%d] Listening on %s (http://%s)", os.Getpid(), Config.Address, baseUrl)
+	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Address, "url": baseUrl})
 
 	app := NewApp(&S3Redirector{}, &MetaStore{})
 	app.Serve(tl)

@@ -34,7 +34,7 @@ func (l *TrackingListener) Accept() (net.Conn, error) {
 
 func (l *TrackingListener) WaitForChildren() {
 	l.wg.Wait()
-	logger.Print("Shut down")
+	logger.Log(D{"fn": "shutdown"})
 }
 
 type trackedConn struct {
