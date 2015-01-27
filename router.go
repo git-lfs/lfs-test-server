@@ -18,6 +18,9 @@ type Router struct {
 	routes []*Route
 }
 
+// NewRouter provides a simple and unforgiving router. The router does a simplistic pattern
+// matching and variable substitution, and has a focus on media types provided in the request's
+// Accept header.
 func NewRouter() *Router {
 	return &Router{}
 }
@@ -32,6 +35,16 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(404)
 }
 
+// Route defines the router for the given pattern. Patterns are defined as such:
+//
+// 	r := Route("/users/{name}/articles/{article}")
+//
+// The path components surrounded by "{}" will be extracted into variables with the
+// names `name` and `article`, respectively. These variables can be accessed with
+// the Vars() function.
+//
+// Once a route is defined, Get(), Head(), Post(), Put(), and Options() can be used
+// to set up handlers for a given media type.
 func (r *Router) Route(pattern string) *Route {
 	route := newRoute(pattern)
 	r.routes = append(r.routes, route)
@@ -43,6 +56,39 @@ type Route struct {
 	matcher   *regexp.Regexp
 	variables map[string]int
 	handlers  map[string]http.HandlerFunc
+}
+
+// Get sets up a handler for a GET request of the given media type.
+func (rt *Route) Get(mediaType string, h http.HandlerFunc) {
+	rt.handlers[mediaType+"GET"] = h
+}
+
+// Head sets up a handler for a HEAD request of the given media type.
+func (rt *Route) Head(mediaType string, h http.HandlerFunc) {
+	rt.handlers[mediaType+"HEAD"] = h
+}
+
+// Post sets up a handler for a POST request of the given media type.
+func (rt *Route) Post(mediaType string, h http.HandlerFunc) {
+	rt.handlers[mediaType+"POST"] = h
+}
+
+// Put sets up a handler for a PUT request of the given media type.
+func (rt *Route) Put(mediaType string, h http.HandlerFunc) {
+	rt.handlers[mediaType+"PUT"] = h
+}
+
+// Options sets up a handler for a OPTIONS request of the given media type.
+func (rt *Route) Options(mediaType string, h http.HandlerFunc) {
+	rt.handlers[mediaType+"OPTIONS"] = h
+}
+
+// Vars retrieves the extracted variables for the given http.Request object.
+func Vars(r *http.Request) map[string]string {
+	mutex.RLock()
+	v := rvars[r]
+	mutex.RUnlock()
+	return v
 }
 
 func newRoute(pattern string) *Route {
@@ -101,31 +147,4 @@ func (rt *Route) handle(w http.ResponseWriter, r *http.Request) bool {
 	mutex.Unlock()
 
 	return true
-}
-
-func (rt *Route) Get(mediaType string, h http.HandlerFunc) {
-	rt.handlers[mediaType+"GET"] = h
-}
-
-func (rt *Route) Head(mediaType string, h http.HandlerFunc) {
-	rt.handlers[mediaType+"HEAD"] = h
-}
-
-func (rt *Route) Post(mediaType string, h http.HandlerFunc) {
-	rt.handlers[mediaType+"POST"] = h
-}
-
-func (rt *Route) Put(mediaType string, h http.HandlerFunc) {
-	rt.handlers[mediaType+"PUT"] = h
-}
-
-func (rt *Route) Options(mediaType string, h http.HandlerFunc) {
-	rt.handlers[mediaType+"OPTIONS"] = h
-}
-
-func Vars(r *http.Request) map[string]string {
-	mutex.RLock()
-	v := rvars[r]
-	mutex.RUnlock()
-	return v
 }
