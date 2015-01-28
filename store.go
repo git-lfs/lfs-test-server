@@ -156,7 +156,7 @@ func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 // Verify is used during the callback phase to indicate to the backend API that the
 // object has been received.
 func (s *MetaStore) Verify(v *RequestVars) error {
-	url := Config.MetaEndpoint + "/" + path.Join(v.User, v.Repo, "media", "blobs", "verify", v.Oid)
+	url := Config.MetaEndpoint + "/" + path.Join(v.User, v.Repo, "media", "blobs", v.Oid, "verify")
 
 	req, err := signedApiPost(url, v)
 	if err != nil {
