@@ -67,7 +67,7 @@ func main() {
 		}
 	}(c, tl)
 
-	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Address})
+	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "scheme": Config.Scheme, "host": Config.Host})
 
 	app := NewApp(&S3Redirector{}, &MetaStore{})
 	app.Serve(tl)
