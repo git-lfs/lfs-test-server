@@ -46,6 +46,7 @@ func init() {
 
 	if port := os.Getenv("PORT"); port != "" {
 		// If $PORT is set, override HARBOUR_ADDRESS
-		Config.Address = "tcp4://:" + port
+		Config.Address = "tcp://:" + port
+		Config.Host = ":" + port
 	}
 }
