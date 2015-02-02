@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"net/url"
@@ -17,8 +16,7 @@ const (
 )
 
 var (
-	logger  = NewKVLogger(os.Stdout)
-	baseUrl string
+	logger = NewKVLogger(os.Stdout)
 )
 
 func main() {
@@ -69,8 +67,7 @@ func main() {
 		}
 	}(c, tl)
 
-	baseUrl = fmt.Sprintf("http://%s", tl.Addr())
-	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Address, "url": baseUrl})
+	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "scheme": Config.Scheme, "host": Config.Host})
 
 	app := NewApp(&S3Redirector{}, &MetaStore{})
 	app.Serve(tl)

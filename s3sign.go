@@ -28,7 +28,7 @@ func S3SignHeader(method, path, sha string) *S3Token {
 	t := time.Now().UTC()
 	return &S3Token{
 		Token:    signedHeaderToken(method, path, sha, t),
-		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, path),
+		Location: fmt.Sprintf("https://s3.amazonaws.com/%s%s", Config.AwsBucket, path),
 		Time:     t,
 	}
 }
@@ -47,7 +47,7 @@ func S3SignQuery(method, path string, expires int) *S3Token {
 	v.Set("X-Amz-Signature", sig)
 	return &S3Token{
 		Token:    sig,
-		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s?%s", Config.AwsBucket, path, v.Encode()),
+		Location: fmt.Sprintf("https://s3.amazonaws.com/%s%s?%s", Config.AwsBucket, path, v.Encode()),
 		Time:     t,
 	}
 }
@@ -63,10 +63,9 @@ func signedQueryToken(method, path string, expires int, t time.Time) string {
 }
 
 func canonicalRequestHeader(method, path, sha string, t time.Time) string {
-	return fmt.Sprintf("%s\n%s\n\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-date:%s\n\n%s\n%s",
+	return fmt.Sprintf("%s\n%s\n\nhost:s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-date:%s\n\n%s\n%s",
 		method,
 		path,
-		Config.AwsBucket,
 		sha,
 		t.Format(isoLayout),
 		signedHeaders,
