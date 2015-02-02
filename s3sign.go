@@ -47,7 +47,7 @@ func S3SignQuery(method, path string, expires int) *S3Token {
 	v.Set("X-Amz-Signature", sig)
 	return &S3Token{
 		Token:    sig,
-		Location: fmt.Sprintf("https://s3.amazonaws.com/%s?%s", Config.AwsBucket, path, v.Encode()),
+		Location: fmt.Sprintf("https://s3.amazonaws.com/%s%s?%s", Config.AwsBucket, path, v.Encode()),
 		Time:     t,
 	}
 }
