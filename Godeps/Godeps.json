@@ -1,0 +1,5 @@
+{
+	"ImportPath": "github.com/github/harbour",
+	"GoVersion": "go1.3",
+	"Deps": []
+}
