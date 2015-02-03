@@ -86,7 +86,7 @@ func TestGetMetaAuthed(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+authedOid {
+	if download.Href != "http://localhost:8080/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 }
@@ -155,7 +155,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+nonexistingOid {
+	if download.Href != "http://localhost:8080/user/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
@@ -173,7 +173,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatal("expected callback link to be present")
 	}
 
-	if callback.Href != "http://127.0.0.1:8080/user/repo/objects/"+nonexistingOid {
+	if callback.Href != "http://localhost:8080/user/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected callback link, got %s", callback.Href)
 	}
 }
@@ -214,7 +214,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "http://127.0.0.1:8080/user/repo/objects/"+authedOid {
+	if download.Href != "http://localhost:8080/user/repo/objects/"+authedOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
