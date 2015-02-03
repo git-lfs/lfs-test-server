@@ -29,7 +29,7 @@ type S3Token struct {
 func S3SignHeader(method, path, sha string) *S3Token {
 	t := time.Now().UTC()
 	return &S3Token{
-		Token:    signedHeaderToken(method, path, sha, t),
+		Token:    signedHeaderToken(method, s3Path(path), sha, t),
 		Location: s3URL(path),
 		Time:     t,
 	}
@@ -38,7 +38,7 @@ func S3SignHeader(method, path, sha string) *S3Token {
 func S3SignQuery(method, path string, expires int) *S3Token {
 	t := time.Now().UTC()
 
-	sig := signedQueryToken(method, path, expires, t)
+	sig := signedQueryToken(method, s3Path(path), expires, t)
 
 	v := url.Values{}
 	v.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
@@ -136,8 +136,7 @@ func sha256Hex(value []byte) string {
 }
 
 func s3URL(p string) string {
-	fullPath := path.Join("/", s3Root(), p)
-	return fmt.Sprintf("https://%s%s", s3Host(), fullPath)
+	return fmt.Sprintf("https://%s%s", s3Host(), s3Path(p))
 }
 
 func s3Host() string {
@@ -145,11 +144,12 @@ func s3Host() string {
 	return fmt.Sprintf("%s.s3.amazonaws.com", parts[0])
 }
 
-func s3Root() string {
+func s3Path(p string) string {
 	parts := strings.Split(Config.AwsBucket, "/")
+	root := ""
 	if len(parts) > 1 {
-		return strings.Join(parts[1:len(parts)], "/")
+		root = strings.Join(parts[1:len(parts)], "/")
 	}
-	return ""
 
+	return path.Join("/", root, p)
 }

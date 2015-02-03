@@ -85,12 +85,12 @@ func TestS3URL(t *testing.T) {
 	Config.AwsBucket = "singlebucket"
 
 	if u := s3URL("foo/bar"); u != "https://singlebucket.s3.amazonaws.com/foo/bar" {
-		t.Fatalf("s3 url calculated incorrectly, got: %s", u)
+		t.Fatalf("bare s3 url calculated incorrectly, got: %s", u)
 	}
 
-	Config.AwsBucket = "foo-cloud/root"
-	if u := s3URL("foo/bar"); u != "https://foo-cloud.s3.amazonaws.com/root/foo/bar" {
-		t.Fatalf("s3 url calculated incorrectly, got: %s", u)
+	Config.AwsBucket = "singlebucket/root"
+	if u := s3URL("foo/bar"); u != "https://singlebucket.s3.amazonaws.com/root/foo/bar" {
+		t.Fatalf("rooted s3 url calculated incorrectly, got: %s", u)
 	}
 }
 
