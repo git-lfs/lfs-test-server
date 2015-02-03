@@ -32,6 +32,7 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	logRequest(r, 404)
 	w.WriteHeader(404)
 }
 

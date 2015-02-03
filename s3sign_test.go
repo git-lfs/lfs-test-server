@@ -81,6 +81,19 @@ func TestS3QuerySignatureLocation(t *testing.T) {
 	}
 }
 
+func TestS3URL(t *testing.T) {
+	Config.AwsBucket = "singlebucket"
+
+	if u := s3URL("foo/bar"); u != "https://singlebucket.s3.amazonaws.com/foo/bar" {
+		t.Fatalf("bare s3 url calculated incorrectly, got: %s", u)
+	}
+
+	Config.AwsBucket = "singlebucket/root"
+	if u := s3URL("foo/bar"); u != "https://singlebucket.s3.amazonaws.com/root/foo/bar" {
+		t.Fatalf("rooted s3 url calculated incorrectly, got: %s", u)
+	}
+}
+
 const (
 	expectedHeaderToken = `AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=host;x-amz-content-sha256;x-amz-date,Signature=1e15d288c066d54cc20d8f664ade3fa96e6744b2861304671f6eb633045a2d4a`
 	expectedQueryToken  = `aa3bfd20c9769c0a95f556fc43ed6665f3f2f875950ad4fe53e84de73f0b2022`

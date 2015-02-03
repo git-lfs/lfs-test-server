@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -27,8 +29,8 @@ type S3Token struct {
 func S3SignHeader(method, path, sha string) *S3Token {
 	t := time.Now().UTC()
 	return &S3Token{
-		Token:    signedHeaderToken(method, path, sha, t),
-		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s", Config.AwsBucket, path),
+		Token:    signedHeaderToken(method, s3Path(path), sha, t),
+		Location: s3URL(path),
 		Time:     t,
 	}
 }
@@ -36,7 +38,7 @@ func S3SignHeader(method, path, sha string) *S3Token {
 func S3SignQuery(method, path string, expires int) *S3Token {
 	t := time.Now().UTC()
 
-	sig := signedQueryToken(method, path, expires, t)
+	sig := signedQueryToken(method, s3Path(path), expires, t)
 
 	v := url.Values{}
 	v.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
@@ -47,7 +49,7 @@ func S3SignQuery(method, path string, expires int) *S3Token {
 	v.Set("X-Amz-Signature", sig)
 	return &S3Token{
 		Token:    sig,
-		Location: fmt.Sprintf("https://%s.s3.amazonaws.com%s?%s", Config.AwsBucket, path, v.Encode()),
+		Location: fmt.Sprintf("%s?%s", s3URL(path), v.Encode()),
 		Time:     t,
 	}
 }
@@ -63,10 +65,10 @@ func signedQueryToken(method, path string, expires int, t time.Time) string {
 }
 
 func canonicalRequestHeader(method, path, sha string, t time.Time) string {
-	return fmt.Sprintf("%s\n%s\n\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-date:%s\n\n%s\n%s",
+	return fmt.Sprintf("%s\n%s\n\nhost:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n\n%s\n%s",
 		method,
 		path,
-		Config.AwsBucket,
+		s3Host(),
 		sha,
 		t.Format(isoLayout),
 		signedHeaders,
@@ -75,7 +77,7 @@ func canonicalRequestHeader(method, path, sha string, t time.Time) string {
 }
 
 func canonicalRequestQuery(method, path string, expires int, t time.Time) string {
-	return fmt.Sprintf("%s\n%s\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s%%2F%s%%2Fs3%%2Faws4_request&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host\nhost:%s.s3.amazonaws.com\n\nhost\nUNSIGNED-PAYLOAD",
+	return fmt.Sprintf("%s\n%s\nX-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s%%2F%s%%2Fs3%%2Faws4_request&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host\nhost:%s\n\nhost\nUNSIGNED-PAYLOAD",
 		method,
 		path,
 		Config.AwsKey,
@@ -83,7 +85,7 @@ func canonicalRequestQuery(method, path string, expires int, t time.Time) string
 		Config.AwsRegion,
 		t.Format(isoLayout),
 		expires,
-		Config.AwsBucket,
+		s3Host(),
 	)
 }
 
@@ -131,4 +133,23 @@ func sha256Hex(value []byte) string {
 	hash := sha256.New()
 	hash.Write(value)
 	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func s3URL(p string) string {
+	return fmt.Sprintf("https://%s%s", s3Host(), s3Path(p))
+}
+
+func s3Host() string {
+	parts := strings.Split(Config.AwsBucket, "/")
+	return fmt.Sprintf("%s.s3.amazonaws.com", parts[0])
+}
+
+func s3Path(p string) string {
+	parts := strings.Split(Config.AwsBucket, "/")
+	root := ""
+	if len(parts) > 1 {
+		root = strings.Join(parts[1:len(parts)], "/")
+	}
+
+	return path.Join("/", root, p)
 }

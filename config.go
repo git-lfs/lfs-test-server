@@ -13,8 +13,8 @@ type Configuration struct {
 	AwsBucket    string
 	AwsRegion    string `config:"us-east-1"`
 	MetaEndpoint string
-	Address      string `config:"tcp4://127.0.0.1:8080"`
-	Host         string `config:"127.0.0.1:8080"`
+	Listen       string `config:"tcp://:8080"`
+	Host         string `config:"localhost:8080"`
 	ApiMediaType string `config:"application/vnd.test-api+json"`
 	HmacKey      string
 	Scheme       string `config:"https"`
@@ -42,5 +42,10 @@ func init() {
 		}
 
 		field.SetString(env)
+	}
+
+	if port := os.Getenv("PORT"); port != "" {
+		// If $PORT is set, override HARBOUR_LISTEN. This is useful for deploying to Heroku.
+		Config.Listen = "tcp://:" + port
 	}
 }

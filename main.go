@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"net/url"
@@ -17,16 +16,15 @@ const (
 )
 
 var (
-	logger  = NewKVLogger(os.Stdout)
-	baseUrl string
+	logger = NewKVLogger(os.Stdout)
 )
 
 func main() {
 	var listener net.Listener
 
-	a, err := url.Parse(Config.Address)
+	a, err := url.Parse(Config.Listen)
 	if err != nil {
-		log.Fatalf("Could not parse listen address: %s, %s", Config.Address, err)
+		log.Fatalf("Could not parse listen address: %s, %s", Config.Listen, err)
 	}
 
 	switch a.Scheme {
@@ -39,17 +37,17 @@ func main() {
 		f := os.NewFile(uintptr(fd), "harbour")
 		listener, err = net.FileListener(f)
 		if err != nil {
-			logger.Fatalf("Can't listen on fd address: %s, %s", Config.Address, err)
+			logger.Fatalf("Can't listen on fd address: %s, %s", Config.Listen, err)
 		}
 	case "tcp", "tcp4", "tcp6":
 		laddr, err := net.ResolveTCPAddr(a.Scheme, a.Host)
 		if err != nil {
-			logger.Fatalf("Could not resolve listen address: %s, %s", Config.Address, err)
+			logger.Fatalf("Could not resolve listen address: %s, %s", Config.Listen, err)
 		}
 
 		listener, err = net.ListenTCP(a.Scheme, laddr)
 		if err != nil {
-			logger.Fatalf("Can't listen on address %s, %s", Config.Address, err)
+			logger.Fatalf("Can't listen on address %s, %s", Config.Listen, err)
 		}
 	default:
 		logger.Fatalf("Unsupported listener protocol: %s", a.Scheme)
@@ -69,8 +67,7 @@ func main() {
 		}
 	}(c, tl)
 
-	baseUrl = fmt.Sprintf("http://%s", tl.Addr())
-	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Address, "url": baseUrl})
+	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen})
 
 	app := NewApp(&S3Redirector{}, &MetaStore{})
 	app.Serve(tl)
