@@ -32,7 +32,6 @@ func (c *httpClient) Do(r *http.Request) (resp *http.Response, err error) {
 		}
 
 		c.cb.Success()
-		return
 	} else {
 		logger.Log(D{"fn": "Client.Do", "err": "tripped"})
 	}
