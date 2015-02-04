@@ -26,12 +26,7 @@ type httpClient struct {
 func (c *httpClient) Do(r *http.Request) (resp *http.Response, err error) {
 	if c.cb.Ready() {
 		resp, err = c.Client.Do(r)
-		if err != nil {
-			c.cb.Fail()
-			return
-		}
-
-		if resp.StatusCode >= 500 {
+		if err != nil || resp.StatusCode >= 500 {
 			c.cb.Fail()
 			return
 		}
