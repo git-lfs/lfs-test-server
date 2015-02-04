@@ -1,5 +1,15 @@
 {
 	"ImportPath": "github.com/github/harbour",
 	"GoVersion": "go1.3",
-	"Deps": []
+	"Deps": [
+		{
+			"ImportPath": "github.com/cenkalti/backoff",
+			"Rev": "c201004c081d767e9749c64d1039749c1353da7b"
+		},
+		{
+			"ImportPath": "github.com/rubyist/circuitbreaker",
+			"Comment": "v2.1.0-3-g75cd96c",
+			"Rev": "75cd96c5019bb882da1026b3bf17678b58cdb9f6"
+		}
+	]
 }

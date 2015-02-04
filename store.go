@@ -7,9 +7,43 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/rubyist/circuitbreaker"
 	"net/http"
 	"path"
 )
+
+var (
+	Client = &httpClient{
+		cb: circuit.NewRateBreaker(0.20, 100),
+	}
+)
+
+type httpClient struct {
+	cb *circuit.Breaker
+	http.Client
+}
+
+func (c *httpClient) Do(r *http.Request) (resp *http.Response, err error) {
+	if c.cb.Ready() {
+		resp, err = c.Client.Do(r)
+		if err != nil {
+			c.cb.Fail()
+			return
+		}
+
+		if resp.StatusCode >= 500 {
+			c.cb.Fail()
+			return
+		}
+
+		c.cb.Success()
+		return
+	} else {
+		logger.Log(D{"fn": "Client.Do", "err": "tripped"})
+	}
+
+	return
+}
 
 // S3Redirector implements the ContentStorer interface to serve content via redirecting to S3.
 type S3Redirector struct {
@@ -45,7 +79,7 @@ func (s *S3Redirector) Exists(meta *Meta) (bool, error) {
 		return false, err
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := Client.Do(req)
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +121,7 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := Client.Do(req)
 	if err != nil {
 		logger.Log(D{"fn": "meta.Get", "err": err})
 		return nil, err
@@ -123,7 +157,7 @@ func (s *MetaStore) Send(v *RequestVars) (*Meta, error) {
 		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := Client.Do(req)
 	if err != nil {
 		logger.Log(D{"fn": "meta.Send", "err": err})
 		return nil, err
@@ -166,7 +200,7 @@ func (s *MetaStore) Verify(v *RequestVars) error {
 		req.Header.Set("X-GitHub-Request-Id", v.RequestId)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := Client.Do(req)
 	if err != nil {
 		logger.Log(D{"fn": "meta.Verify", "err": err})
 		return err
