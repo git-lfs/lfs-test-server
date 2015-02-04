@@ -1,2 +1,2 @@
 #!/bin/sh
-go test -race "$@"
+GOPATH="`pwd`/Godeps/_workspace" go test -race "$@"
