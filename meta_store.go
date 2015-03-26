@@ -9,6 +9,8 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+// MetaStore implements a metadata storage. It stores user credentials and Meta information
+// for objects. The storage is handled by boltdb.
 type MetaStore struct {
 	db *bolt.DB
 }
@@ -23,6 +25,7 @@ var (
 	objectsBucket = []byte("objects")
 )
 
+// NewMetaStore creates a new MetaStore using the boltdb database at dbFile.
 func NewMetaStore(dbFile string) (*MetaStore, error) {
 	db, err := bolt.Open(dbFile, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -44,9 +47,11 @@ func NewMetaStore(dbFile string) (*MetaStore, error) {
 	return &MetaStore{db: db}, nil
 }
 
+// Get retrieves the Meta information for an object given information in
+// RequestVars
 func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	if !s.authenticate(v.User, v.Password) {
-		return nil, NewAuthError()
+		return nil, newAuthError()
 	}
 
 	var meta Meta
@@ -79,9 +84,10 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 	return &meta, err
 }
 
+// Put writes meta information from RequestVars to the store.
 func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
 	if !s.authenticate(v.User, v.Password) {
-		return nil, NewAuthError()
+		return nil, newAuthError()
 	}
 
 	// Check if it exists first
@@ -119,10 +125,12 @@ func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
 	return &meta, nil
 }
 
+// Close closes the underlying boltdb.
 func (s *MetaStore) Close() {
 	s.db.Close()
 }
 
+// AddUser adds user credentials to the meta store.
 func (s *MetaStore) AddUser(user, pass string) error {
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(usersBucket)
@@ -167,6 +175,6 @@ func (e authError) AuthError() bool {
 	return true
 }
 
-func NewAuthError() error {
+func newAuthError() error {
 	return authError{errors.New("Forbidden")}
 }

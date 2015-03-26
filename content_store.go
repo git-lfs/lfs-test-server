@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 )
 
+// ContentStore provides a simple file system based storage.
 type ContentStore struct {
 	basePath string
 }
 
+// NewContentStore creates a ContentStore at the base directory.
 func NewContentStore(base string) (*ContentStore, error) {
 	if err := os.MkdirAll(base, 0750); err != nil {
 		return nil, err
@@ -18,12 +20,15 @@ func NewContentStore(base string) (*ContentStore, error) {
 	return &ContentStore{base}, nil
 }
 
+// Get takes a Meta object and retreives the content from the store, returning
+// it as an io.Reader.
 func (s *ContentStore) Get(meta *Meta) (io.Reader, error) {
 	path := filepath.Join(s.basePath, transformKey(meta.Oid))
 
 	return os.Open(path)
 }
 
+// Put takes a Meta object and an io.Reader and writes the content to the store.
 func (s *ContentStore) Put(meta *Meta, r io.Reader) error {
 	path := filepath.Join(s.basePath, transformKey(meta.Oid))
 	tmpPath := path + ".tmp"

@@ -26,18 +26,21 @@ func init() {
 	}
 }
 
-type D map[string]interface{}
+type kv map[string]interface{}
 
+// KVLogger provides a logger that logs data in key/value pairs.
 type KVLogger struct {
 	w  io.Writer
 	mu sync.Mutex
 }
 
+// NewKVLogger creates a KVLogger that writes to `out`.
 func NewKVLogger(out io.Writer) *KVLogger {
 	return &KVLogger{w: out}
 }
 
-func (l *KVLogger) Log(data D) {
+// Log logs the key/value pairs to the logger's output.
+func (l *KVLogger) Log(data kv) {
 	var file string
 	var line int
 	var ok bool
@@ -63,11 +66,8 @@ func (l *KVLogger) Log(data D) {
 	l.mu.Unlock()
 }
 
-func (l *KVLogger) Fatal(data D) {
+// Fatal is equivalent to Log() follwed by a call to os.Exit(1)
+func (l *KVLogger) Fatal(data kv) {
 	l.Log(data)
 	os.Exit(1)
-}
-
-func (l *KVLogger) Fatalf(format string, v ...interface{}) {
-	l.Fatal(D{"err": fmt.Sprintf(format, v...)})
 }

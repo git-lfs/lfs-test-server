@@ -8,21 +8,6 @@ import (
 	"net/http"
 )
 
-type ContentStorer interface {
-	Get(*Meta) (io.Reader, error)
-
-	Put(*Meta, io.Reader) error
-}
-
-// MetaStorer provides an interface for serving object metadata.
-type MetaStorer interface {
-	// Get fetches an object's metadata from the metadata storage service.
-	Get(*RequestVars) (*Meta, error)
-
-	// Send sends an object's metadata to the metadata storage service.
-	Put(*RequestVars) (*Meta, error)
-}
-
 // RequestVars contain variables from the HTTP request. Variables from routing, json body decoding, and
 // some headers are stored.
 type RequestVars struct {
@@ -65,14 +50,16 @@ type link struct {
 	Header map[string]string `json:"header,omitempty"`
 }
 
+// App links a Router, ContentStore, and MetaStore to provide the LFS server.
 type App struct {
-	Router       *Router
-	ContentStore ContentStorer
-	MetaStore    MetaStorer
+	router       *Router
+	contentStore *ContentStore
+	metaStore    *MetaStore
 }
 
-func NewApp(content ContentStorer, meta MetaStorer) *App {
-	app := &App{ContentStore: content, MetaStore: meta}
+// NewApp creates a new App using the ContentStore and MetaStore provided
+func NewApp(content *ContentStore, meta *MetaStore) *App {
+	app := &App{contentStore: content, metaStore: meta}
 
 	r := NewRouter()
 
@@ -86,26 +73,27 @@ func NewApp(content ContentStorer, meta MetaStorer) *App {
 	o := r.Route("/{user}/{repo}/objects")
 	o.Post(metaMediaType, app.PostHandler)
 
-	app.Router = r
+	app.router = r
 
 	return app
 }
 
+// Serve calls http.Serve with the provided Listener and the app's router
 func (a *App) Serve(l net.Listener) error {
-	return http.Serve(l, a.Router)
+	return http.Serve(l, a.router)
 }
 
-// Download the data
+// GetContentHandler gets the content from the content store
 func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
-	meta, err := a.MetaStore.Get(rv)
+	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		w.WriteHeader(404)
 		logRequest(r, 404)
 		return
 	}
 
-	content, err := a.ContentStore.Get(meta)
+	content, err := a.contentStore.Get(meta)
 	if err != nil {
 		w.WriteHeader(404)
 		logRequest(r, 404)
@@ -116,10 +104,10 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
-// Just get the metadata
+// GetMetaHandler retrieves metadata about the object
 func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
-	meta, err := a.MetaStore.Get(rv)
+	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		if isAuthError(err) {
 			w.WriteHeader(401)
@@ -143,10 +131,10 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
-// Request to upload
+// PostHandler instructs the client how to upload data
 func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
-	meta, err := a.MetaStore.Put(rv)
+	meta, err := a.metaStore.Put(rv)
 	if err != nil {
 		if isAuthError(err) {
 			w.WriteHeader(401)
@@ -173,13 +161,15 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, sentStatus)
 }
 
-// Handle the upload
+// PutHandler receives data from the client and puts it into the content store
 func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
 }
 
+// Represent takes a RequestVars and Meta and turns it into a Representation suitable
+// for json encoding
 func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representation {
 	rep := &Representation{
 		Oid:   meta.Oid,
@@ -229,7 +219,7 @@ func unpack(r *http.Request) *RequestVars {
 }
 
 func logRequest(r *http.Request, status int) {
-	logger.Log(D{"method": r.Method, "url": r.URL, "status": status, "request_id": Vars(r)["request_id"]})
+	logger.Log(kv{"method": r.Method, "url": r.URL, "status": status, "request_id": Vars(r)["request_id"]})
 }
 
 func isAuthError(err error) bool {

@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// TrackingListener tracks incoming connections so that application shutdown can
+// wait until all in progress connections are finished before exiting.
 type TrackingListener struct {
 	wg          sync.WaitGroup
 	connections map[net.Conn]bool
@@ -16,6 +18,8 @@ type TrackingListener struct {
 	net.Listener
 }
 
+// NewTrackingListener creates a new TrackingListener, listening on the supplied
+// address.
 func NewTrackingListener(addr string) (*TrackingListener, error) {
 	var listener net.Listener
 
@@ -53,6 +57,8 @@ func NewTrackingListener(addr string) (*TrackingListener, error) {
 	return &TrackingListener{Listener: listener, connections: make(map[net.Conn]bool)}, nil
 }
 
+// Accept wraps the underlying net.Listener's Accept(), keeping track of all connections
+// accepted.
 func (l *TrackingListener) Accept() (net.Conn, error) {
 	l.wg.Add(1)
 	conn, err := l.Listener.Accept()
@@ -69,9 +75,11 @@ func (l *TrackingListener) Accept() (net.Conn, error) {
 	return c, nil
 }
 
+// WaitForChildren is called during shutdown. It will return once all the existing
+// connections have finished.
 func (l *TrackingListener) WaitForChildren() {
 	l.wg.Wait()
-	logger.Log(D{"fn": "shutdown"})
+	logger.Log(kv{"fn": "shutdown"})
 }
 
 type trackedConn struct {

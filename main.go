@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -20,17 +19,17 @@ var (
 func main() {
 	tl, err := NewTrackingListener(Config.Listen)
 	if err != nil {
-		log.Fatalf("Could not create listener: %s", err)
+		logger.Fatal(kv{"fn": "main", "err": "Could not create listener: " + err.Error()})
 	}
 
 	metaStore, err := NewMetaStore(Config.MetaDB)
 	if err != nil {
-		log.Fatalf("Could not open the meta store: %s", err)
+		logger.Fatal(kv{"fn": "main", "err": "Could not open the meta store: " + err.Error()})
 	}
 
 	contentStore, err := NewContentStore(Config.ContentPath)
 	if err != nil {
-		log.Fatalf("Could not open the content store: %s", err)
+		logger.Fatal(kv{"fn": "main", "err": "Could not open the content store: " + err.Error()})
 	}
 
 	c := make(chan os.Signal, 1)
@@ -45,7 +44,7 @@ func main() {
 		}
 	}(c, tl)
 
-	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen})
+	logger.Log(kv{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen})
 
 	app := NewApp(contentStore, metaStore)
 	app.Serve(tl)

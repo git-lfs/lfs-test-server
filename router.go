@@ -14,13 +14,14 @@ var (
 	rvars = make(map[*http.Request]map[string]string)
 )
 
+// Router provides a simple and unforgiving router. The router does a simplistic pattern
+// matching and variable substitution, and has a focus on media types provided in the request's
+// Accept header.
 type Router struct {
 	routes []*Route
 }
 
-// NewRouter provides a simple and unforgiving router. The router does a simplistic pattern
-// matching and variable substitution, and has a focus on media types provided in the request's
-// Accept header.
+// NewRouter creates a new Router
 func NewRouter() *Router {
 	return &Router{}
 }
@@ -52,6 +53,7 @@ func (rtr *Router) Route(pattern string) *Route {
 	return route
 }
 
+// Route matches paths to handlers
 type Route struct {
 	pattern   string
 	matcher   *regexp.Regexp

@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// Configuration holds application configuration. Values will be pulled from
+// environment variables, prefixed by keyPrefix. Default values can be added
+// via tags.
 type Configuration struct {
 	Listen      string `config:"tcp://:8080"`
 	Host        string `config:"localhost:8080"`
@@ -15,6 +18,7 @@ type Configuration struct {
 	ContentPath string `config:"lfs-content"`
 }
 
+// Config is the global app configuration
 var Config = &Configuration{}
 
 const keyPrefix = "HARBOUR"
