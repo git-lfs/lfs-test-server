@@ -23,12 +23,12 @@ func main() {
 		log.Fatalf("Could not create listener: %s", err)
 	}
 
-	metaStore, err := NewMetaStore("lfs.db")
+	metaStore, err := NewMetaStore(Config.MetaDB)
 	if err != nil {
 		log.Fatalf("Could not open the meta store: %s", err)
 	}
 
-	contentStore, err := NewContentStore("lfscontent")
+	contentStore, err := NewContentStore(Config.ContentPath)
 	if err != nil {
 		log.Fatalf("Could not open the content store: %s", err)
 	}
