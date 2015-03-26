@@ -377,13 +377,7 @@ var (
 )
 
 func testSetup() {
-	Config.AwsKey = "AKIAIOSFODNN7EXAMPLE"
-	Config.AwsSecretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-	Config.AwsBucket = "examplebucket"
 	Config.Scheme = "http"
-
-	contentSha = sha256Hex([]byte(content))
-	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
 
 	app := NewApp(testContentStore, testMetaStore)
 	mediaServer = httptest.NewServer(app.Router)

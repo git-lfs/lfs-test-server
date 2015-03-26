@@ -8,16 +8,9 @@ import (
 )
 
 type Configuration struct {
-	AwsKey       string
-	AwsSecretKey string
-	AwsBucket    string
-	AwsRegion    string `config:"us-east-1"`
-	MetaEndpoint string
-	Listen       string `config:"tcp://:8080"`
-	Host         string `config:"localhost:8080"`
-	ApiMediaType string `config:"application/vnd.test-api+json"`
-	HmacKey      string
-	Scheme       string `config:"https"`
+	Listen string `config:"tcp://:8080"`
+	Host   string `config:"localhost:8080"`
+	Scheme string `config:"https"`
 }
 
 var Config = &Configuration{}
