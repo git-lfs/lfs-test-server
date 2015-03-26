@@ -3,21 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 )
 
-// ContentStorer provides an interface for serving the media content.
 type ContentStorer interface {
-	// Get fetches the content from its storage and write it to the response writer. It will return
-	// an http status code that may be used by the caller for bookeeping.
-	Get(*Meta, http.ResponseWriter, *http.Request) int
+	Get(*Meta) (io.Reader, error)
 
-	// PutLink generates a link where content may be uploaded.
-	PutLink(*Meta) *link
-
-	// Exists checks to see whether the requested object exists in the ContentStorers storage.
-	Exists(*Meta) (bool, error)
+	Put(*Meta, io.Reader) error
 }
 
 // MetaStorer provides an interface for serving object metadata.
@@ -111,8 +105,15 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := a.ContentStore.Get(meta, w, r)
-	logRequest(r, status)
+	content, err := a.ContentStore.Get(meta)
+	if err != nil {
+		w.WriteHeader(404)
+		logRequest(r, 404)
+		return
+	}
+
+	io.Copy(w, content)
+	logRequest(r, 200)
 }
 
 // Just get the metadata
@@ -188,13 +189,10 @@ func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representatio
 
 	rep.Links["download"] = &link{Href: rv.ObjectLink()}
 	if upload {
-		rep.Links["upload"] = a.ContentStore.PutLink(meta)
-
 		header := make(map[string]string)
 		header["Accept"] = metaMediaType
 		header["Authorization"] = rv.Authorization
-		header["PathPrefix"] = meta.PathPrefix
-		rep.Links["callback"] = &link{Href: rv.ObjectLink(), Header: header}
+		rep.Links["upload"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
 	return rep
 }

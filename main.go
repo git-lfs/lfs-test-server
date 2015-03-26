@@ -28,6 +28,11 @@ func main() {
 		log.Fatalf("Could not open the meta store: %s", err)
 	}
 
+	contentStore, err := NewContentStore("lfscontent")
+	if err != nil {
+		log.Fatalf("Could not open the content store: %s", err)
+	}
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
 	go func(c chan os.Signal, listener net.Listener) {
@@ -42,7 +47,7 @@ func main() {
 
 	logger.Log(D{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen})
 
-	app := NewApp(&S3Redirector{}, metaStore)
+	app := NewApp(contentStore, metaStore)
 	app.Serve(tl)
 	tl.WaitForChildren()
 }

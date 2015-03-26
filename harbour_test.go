@@ -8,17 +8,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
 	"testing"
 	"time"
 )
 
 var (
-	testMetaStore  *MetaStore
-	testUser       = "bilbo"
-	testPass       = "baggins"
-	authedOid      = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
-	nonexistingOid = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
+	testMetaStore    *MetaStore
+	testContentStore *ContentStore
+	testUser         = "bilbo"
+	testPass         = "baggins"
+	authedOid        = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
+	nonexistingOid   = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
 )
 
 func TestMain(m *testing.M) {
@@ -27,11 +27,23 @@ func TestMain(m *testing.M) {
 	var err error
 	testMetaStore, err = NewMetaStore("lfs-test.db")
 	if err != nil {
+		fmt.Printf("Error creating meta store: %s", err)
+		os.Exit(1)
+	}
+
+	testContentStore, err = NewContentStore("lfs-content-test")
+	if err != nil {
+		fmt.Printf("Error creating content store: %s", err)
 		os.Exit(1)
 	}
 
 	if err := seedMetaStore(); err != nil {
 		fmt.Printf("Error seeding meta store: %s", err)
+		os.Exit(1)
+	}
+
+	if err := seedContentStore(); err != nil {
+		fmt.Printf("Error seeding content store: %s", err)
 		os.Exit(1)
 	}
 
@@ -45,6 +57,16 @@ func seedMetaStore() error {
 
 	rv := &RequestVars{User: testUser, Password: testPass, Oid: authedOid, Size: 1234}
 	if _, err := testMetaStore.Put(rv); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func seedContentStore() error {
+	meta := &Meta{Oid: authedOid}
+	buf := bytes.NewBuffer([]byte("content"))
+	if err := testContentStore.Put(meta, buf); err != nil {
 		return err
 	}
 
@@ -67,8 +89,17 @@ func TestGetAuthed(t *testing.T) {
 		t.Fatalf("response error: %s", err)
 	}
 
-	if res.StatusCode != 302 {
+	if res.StatusCode != 200 {
 		t.Fatalf("expected status 302, got %d", res.StatusCode)
+	}
+
+	by, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("expected response to contain content, got error: %s", err)
+	}
+
+	if string(by) != "content" {
+		t.Fatalf("expected content to be `content`, got: %s", string(by))
 	}
 }
 
@@ -195,7 +226,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatal("expected upload link to be present")
 	}
 
-	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(nonexistingOid) {
+	if upload.Href != "http://localhost:8080/bilbo/repo/objects/"+nonexistingOid {
 		t.Fatalf("expected upload link, got %s", upload.Href)
 	}
 }
@@ -245,7 +276,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 		t.Fatalf("expected upload link to be present")
 	}
 
-	if upload.Href != "https://examplebucket.s3.amazonaws.com"+oidPath(authedOid) {
+	if upload.Href != "http://localhost:8080/bilbo/repo/objects/"+authedOid {
 		t.Fatalf("expected upload link, got %s", upload.Href)
 	}
 }
@@ -299,7 +330,7 @@ func TestMediaTypesRequired(t *testing.T) {
 	testSetup()
 	defer testTeardown()
 
-	m := []string{"GET", "PUT", "OPTIONS"}
+	m := []string{"GET", "PUT", "POST", "HEAD"}
 	for _, method := range m {
 		req, err := http.NewRequest(method, mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
 		if err != nil {
@@ -328,13 +359,13 @@ func TestMediaTypesParsed(t *testing.T) {
 	req.SetBasicAuth(testUser, testPass)
 	req.Header.Set("Accept", contentMediaType+"; charset=utf-8")
 
-	res, err := http.DefaultTransport.RoundTrip(req) // Do not follow the redirect
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("response error: %s", err)
 	}
 
-	if res.StatusCode != 302 {
-		t.Fatalf("expected status 302, got %d", res.StatusCode)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 }
 
@@ -354,7 +385,7 @@ func testSetup() {
 	contentSha = sha256Hex([]byte(content))
 	now, _ = time.Parse(time.RFC822, "24 May 13 00:00 GMT")
 
-	app := NewApp(&TestRedirector{}, testMetaStore)
+	app := NewApp(testContentStore, testMetaStore)
 	mediaServer = httptest.NewServer(app.Router)
 
 	logger = NewKVLogger(ioutil.Discard)
@@ -362,28 +393,4 @@ func testSetup() {
 
 func testTeardown() {
 	mediaServer.Close()
-}
-
-type TestRedirector struct {
-}
-
-func (t *TestRedirector) Get(meta *Meta, w http.ResponseWriter, r *http.Request) int {
-	token := S3SignQuery("GET", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), 86400)
-	w.Header().Set("Location", token.Location)
-	w.WriteHeader(302)
-	return 302
-}
-
-func (t *TestRedirector) PutLink(meta *Meta) *link {
-	token := S3SignHeader("PUT", path.Join("/", meta.PathPrefix, oidPath(meta.Oid)), meta.Oid)
-	header := make(map[string]string)
-	header["Authorization"] = token.Token
-	header["x-amz-content-sha256"] = meta.Oid
-	header["x-amz-date"] = token.Time.Format(isoLayout)
-
-	return &link{Href: token.Location, Header: header}
-}
-
-func (t *TestRedirector) Exists(*Meta) (bool, error) {
-	return true, nil
 }
