@@ -46,9 +46,9 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //
 // Once a route is defined, Get(), Head(), Post(), Put(), and Options() can be used
 // to set up handlers for a given media type.
-func (r *Router) Route(pattern string) *Route {
+func (rtr *Router) Route(pattern string) *Route {
 	route := newRoute(pattern)
-	r.routes = append(r.routes, route)
+	rtr.routes = append(rtr.routes, route)
 	return route
 }
 

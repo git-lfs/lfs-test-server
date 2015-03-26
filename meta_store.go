@@ -167,6 +167,6 @@ func (e authError) AuthError() bool {
 	return true
 }
 
-func NewAuthError() authError {
+func NewAuthError() error {
 	return authError{errors.New("Forbidden")}
 }

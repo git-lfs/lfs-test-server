@@ -35,7 +35,7 @@ type RequestVars struct {
 	PathPrefix    string
 	Status        int64
 	Body          string
-	RequestId     string
+	RequestID     string
 }
 
 // Meta is object metadata as seen by the object and metadata stores.
@@ -208,7 +208,7 @@ func unpack(r *http.Request) *RequestVars {
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
 		PathPrefix:    r.Header.Get("PathPrefix"),
-		RequestId:     vars["request_id"],
+		RequestID:     vars["request_id"],
 	}
 
 	if r.Method == "POST" { // Maybe also check if +json
