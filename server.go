@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,10 +26,7 @@ type MetaStorer interface {
 	Get(*RequestVars) (*Meta, error)
 
 	// Send sends an object's metadata to the metadata storage service.
-	Send(*RequestVars) (*Meta, error)
-
-	// Verify informs the metadata storage service that the object has been received by the object store.
-	Verify(*RequestVars) error
+	Put(*RequestVars) (*Meta, error)
 }
 
 // RequestVars contain variables from the HTTP request. Variables from routing, json body decoding, and
@@ -39,6 +35,7 @@ type RequestVars struct {
 	Oid           string
 	Size          int64
 	User          string
+	Password      string
 	Repo          string
 	Authorization string
 	PathPrefix    string
@@ -74,10 +71,6 @@ type link struct {
 	Header map[string]string `json:"header,omitempty"`
 }
 
-var (
-	apiAuthError = errors.New("auth error")
-)
-
 type App struct {
 	Router       *Router
 	ContentStore ContentStorer
@@ -94,9 +87,7 @@ func NewApp(content ContentStorer, meta MetaStorer) *App {
 	s.Head(contentMediaType, app.GetContentHandler)
 	s.Get(metaMediaType, app.GetMetaHandler)
 	s.Head(metaMediaType, app.GetMetaHandler)
-	s.Options(contentMediaType, app.OptionsHandler)
 	s.Put(contentMediaType, app.PutHandler)
-	s.Post(metaMediaType, app.CallbackHandler)
 
 	o := r.Route("/{user}/{repo}/objects")
 	o.Post(metaMediaType, app.PostHandler)
@@ -110,6 +101,7 @@ func (a *App) Serve(l net.Listener) error {
 	return http.Serve(l, a.Router)
 }
 
+// Download the data
 func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
 	meta, err := a.MetaStore.Get(rv)
@@ -123,13 +115,20 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, status)
 }
 
+// Just get the metadata
 func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
 	meta, err := a.MetaStore.Get(rv)
 	if err != nil {
-		w.WriteHeader(404)
-		fmt.Fprint(w, `{"message":"Not Found"}`)
-		logRequest(r, 404)
+		if isAuthError(err) {
+			w.WriteHeader(401)
+			fmt.Fprintf(w, `{"message":"Forbidden"}`)
+			logRequest(r, 401)
+		} else {
+			w.WriteHeader(404)
+			fmt.Fprint(w, `{"message":"Not Found"}`)
+			logRequest(r, 404)
+		}
 		return
 	}
 
@@ -143,20 +142,20 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
+// Request to upload
 func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
-	meta, err := a.MetaStore.Send(rv)
-
-	if err == apiAuthError {
-		logRequest(r, 403)
-		w.WriteHeader(403)
-		return
-	}
-
+	meta, err := a.MetaStore.Put(rv)
 	if err != nil {
-		w.WriteHeader(404)
-		fmt.Fprint(w, `{"message":"Not Found"}`)
-		logRequest(r, 404)
+		if isAuthError(err) {
+			w.WriteHeader(401)
+			fmt.Fprint(w, `{"message":"Forbidden"}`)
+			logRequest(r, 401)
+		} else {
+			w.WriteHeader(404)
+			fmt.Fprint(w, `{"message":"Not Found"}`)
+			logRequest(r, 404)
+		}
 		return
 	}
 
@@ -173,71 +172,11 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, sentStatus)
 }
 
-func (a *App) OptionsHandler(w http.ResponseWriter, r *http.Request) {
-	av := unpack(r)
-	m, err := a.MetaStore.Get(av)
-
-	if err == apiAuthError {
-		logRequest(r, 403)
-		w.WriteHeader(403)
-		return
-	}
-
-	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
-		return
-	}
-
-	if m.Oid == "" {
-		w.WriteHeader(204)
-		logRequest(r, 204)
-	}
-
-	logRequest(r, 200)
-}
-
+// Handle the upload
 func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
 	w.WriteHeader(405)
 	logRequest(r, 405)
-}
-
-func (a *App) CallbackHandler(w http.ResponseWriter, r *http.Request) {
-	rv := unpack(r)
-
-	meta, err := a.MetaStore.Get(rv)
-	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
-		return
-	}
-
-	ok, err := a.ContentStore.Exists(meta)
-	if !ok || err != nil {
-		logRequest(r, 404) // Probably need to log an error
-		w.WriteHeader(404)
-		return
-	}
-
-	err = a.MetaStore.Verify(rv)
-
-	if err == apiAuthError {
-		logRequest(r, 403)
-		w.WriteHeader(403)
-		return
-	}
-
-	if err != nil {
-		w.WriteHeader(404)
-		fmt.Fprint(w, `{"message":"Not Found"}`)
-		logRequest(r, 404)
-		return
-	}
-
-	w.Header().Set("Content-Type", metaMediaType)
-	fmt.Fprint(w, `{"message":"ok"}`)
-	logRequest(r, 200)
 }
 
 func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representation {
@@ -262,8 +201,11 @@ func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representatio
 
 func unpack(r *http.Request) *RequestVars {
 	vars := Vars(r)
+	user, pass, _ := r.BasicAuth()
+
 	rv := &RequestVars{
-		User:          vars["user"],
+		User:          user,
+		Password:      pass,
 		Repo:          vars["repo"],
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
@@ -290,4 +232,14 @@ func unpack(r *http.Request) *RequestVars {
 
 func logRequest(r *http.Request, status int) {
 	logger.Log(D{"method": r.Method, "url": r.URL, "status": status, "request_id": Vars(r)["request_id"]})
+}
+
+func isAuthError(err error) bool {
+	type autherror interface {
+		AuthError() bool
+	}
+	if ae, ok := err.(autherror); ok {
+		return ae.AuthError()
+	}
+	return false
 }

@@ -1,7 +1,12 @@
 {
 	"ImportPath": "github.com/github/harbour",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.4.1",
 	"Deps": [
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "data/v1-189-gd9a0f51",
+			"Rev": "d9a0f51bee413ccff75251740d7d78736a9c4a49"
+		},
 		{
 			"ImportPath": "github.com/cenkalti/backoff",
 			"Rev": "c201004c081d767e9749c64d1039749c1353da7b"
