@@ -119,7 +119,7 @@ func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
 	return &meta, nil
 }
 
-func (s *MetaStore) Shutdown() {
+func (s *MetaStore) Close() {
 	s.db.Close()
 }
 

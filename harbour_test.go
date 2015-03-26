@@ -9,82 +9,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 )
-
-var (
-	testMetaStore    *MetaStore
-	testContentStore *ContentStore
-	testUser         = "bilbo"
-	testPass         = "baggins"
-	authedOid        = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
-	nonexistingOid   = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
-)
-
-func TestMain(m *testing.M) {
-	os.Remove("lfs-test.db")
-
-	var err error
-	testMetaStore, err = NewMetaStore("lfs-test.db")
-	if err != nil {
-		fmt.Printf("Error creating meta store: %s", err)
-		os.Exit(1)
-	}
-
-	testContentStore, err = NewContentStore("lfs-content-test")
-	if err != nil {
-		fmt.Printf("Error creating content store: %s", err)
-		os.Exit(1)
-	}
-
-	if err := seedMetaStore(); err != nil {
-		fmt.Printf("Error seeding meta store: %s", err)
-		os.Exit(1)
-	}
-
-	if err := seedContentStore(); err != nil {
-		fmt.Printf("Error seeding content store: %s", err)
-		os.Exit(1)
-	}
-
-	os.Exit(m.Run())
-}
-
-func seedMetaStore() error {
-	if err := testMetaStore.AddUser(testUser, testPass); err != nil {
-		return err
-	}
-
-	rv := &RequestVars{User: testUser, Password: testPass, Oid: authedOid, Size: 1234}
-	if _, err := testMetaStore.Put(rv); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func seedContentStore() error {
-	meta := &Meta{Oid: authedOid}
-	buf := bytes.NewBuffer([]byte("content"))
-	if err := testContentStore.Put(meta, buf); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func TestGetAuthed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
 	req.SetBasicAuth(testUser, testPass)
 	req.Header.Set("Accept", contentMediaType)
 
-	res, err := http.DefaultTransport.RoundTrip(req) // Do not follow the redirect
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("response error: %s", err)
 	}
@@ -104,10 +39,7 @@ func TestGetAuthed(t *testing.T) {
 }
 
 func TestGetUnauthed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -124,10 +56,7 @@ func TestGetUnauthed(t *testing.T) {
 }
 
 func TestGetMetaAuthed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/bilbo/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/bilbo/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -162,10 +91,7 @@ func TestGetMetaAuthed(t *testing.T) {
 }
 
 func TestGetMetaUnauthed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -182,10 +108,7 @@ func TestGetMetaUnauthed(t *testing.T) {
 }
 
 func TestPostAuthedNewObject(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("POST", mediaServer.URL+"/bilbo/repo/objects", nil)
+	req, err := http.NewRequest("POST", lfsServer.URL+"/bilbo/repo/objects", nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -232,10 +155,7 @@ func TestPostAuthedNewObject(t *testing.T) {
 }
 
 func TestPostAuthedExistingObject(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("POST", mediaServer.URL+"/bilbo/repo/objects", nil)
+	req, err := http.NewRequest("POST", lfsServer.URL+"/bilbo/repo/objects", nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -282,10 +202,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 }
 
 func TestPostUnauthed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("POST", mediaServer.URL+"/bilbo/readonly/objects", nil)
+	req, err := http.NewRequest("POST", lfsServer.URL+"/bilbo/readonly/objects", nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -305,14 +222,11 @@ func TestPostUnauthed(t *testing.T) {
 }
 
 func TestPut(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("PUT", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("PUT", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
-	req.Header.Set("Authorization", authedToken)
+	req.SetBasicAuth(testUser, testPass)
 	req.Header.Set("Accept", contentMediaType)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
@@ -327,12 +241,9 @@ func TestPut(t *testing.T) {
 }
 
 func TestMediaTypesRequired(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
 	m := []string{"GET", "PUT", "POST", "HEAD"}
 	for _, method := range m {
-		req, err := http.NewRequest(method, mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+		req, err := http.NewRequest(method, lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 		if err != nil {
 			t.Fatalf("request error: %s", err)
 		}
@@ -349,10 +260,7 @@ func TestMediaTypesRequired(t *testing.T) {
 }
 
 func TestMediaTypesParsed(t *testing.T) {
-	testSetup()
-	defer testTeardown()
-
-	req, err := http.NewRequest("GET", mediaServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -370,21 +278,77 @@ func TestMediaTypesParsed(t *testing.T) {
 }
 
 var (
-	now         time.Time
-	mediaServer *httptest.Server
-
-	authedToken = "AUTHORIZED"
+	lfsServer        *httptest.Server
+	testMetaStore    *MetaStore
+	testContentStore *ContentStore
+	testUser         = "bilbo"
+	testPass         = "baggins"
+	authedOid        = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
+	nonexistingOid   = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
 )
 
-func testSetup() {
+func TestMain(m *testing.M) {
 	Config.Scheme = "http"
 
+	os.Remove("lfs-test.db")
+
+	var err error
+	testMetaStore, err = NewMetaStore("lfs-test.db")
+	if err != nil {
+		fmt.Printf("Error creating meta store: %s", err)
+		os.Exit(1)
+	}
+
+	testContentStore, err = NewContentStore("lfs-content-test")
+	if err != nil {
+		fmt.Printf("Error creating content store: %s", err)
+		os.Exit(1)
+	}
+
+	if err := seedMetaStore(); err != nil {
+		fmt.Printf("Error seeding meta store: %s", err)
+		os.Exit(1)
+	}
+
+	if err := seedContentStore(); err != nil {
+		fmt.Printf("Error seeding content store: %s", err)
+		os.Exit(1)
+	}
+
 	app := NewApp(testContentStore, testMetaStore)
-	mediaServer = httptest.NewServer(app.Router)
+	lfsServer = httptest.NewServer(app.Router)
 
 	logger = NewKVLogger(ioutil.Discard)
+
+	ret := m.Run()
+
+	lfsServer.Close()
+	testMetaStore.Close()
+	os.Remove("lfs-test.db")
+	os.RemoveAll("lfs-content-test")
+
+	os.Exit(ret)
 }
 
-func testTeardown() {
-	mediaServer.Close()
+func seedMetaStore() error {
+	if err := testMetaStore.AddUser(testUser, testPass); err != nil {
+		return err
+	}
+
+	rv := &RequestVars{User: testUser, Password: testPass, Oid: authedOid, Size: 1234}
+	if _, err := testMetaStore.Put(rv); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func seedContentStore() error {
+	meta := &Meta{Oid: authedOid}
+	buf := bytes.NewBuffer([]byte("content"))
+	if err := testContentStore.Put(meta, buf); err != nil {
+		return err
+	}
+
+	return nil
 }
