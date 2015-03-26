@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	contentMediaType = "application/vnd.git-media"
+	contentMediaType = "application/vnd.git-lfs"
 	metaMediaType    = contentMediaType + "+json"
 )
 
