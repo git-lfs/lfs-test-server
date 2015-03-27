@@ -33,8 +33,8 @@ type Meta struct {
 
 // Representation is object medata as seen by clients of harbour.
 type Representation struct {
-	Oid   string
-	Size  int64
+	Oid   string           `json:"oid"`
+	Size  int64            `json:"size"`
 	Links map[string]*link `json:"_links"`
 }
 
@@ -163,9 +163,28 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 // PutHandler receives data from the client and puts it into the content store
 func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Allow", "GET, HEAD, POST, OPTIONS")
-	w.WriteHeader(405)
-	logRequest(r, 405)
+	rv := unpack(r)
+	meta, err := a.metaStore.Get(rv)
+	if err != nil {
+		if isAuthError(err) {
+			w.WriteHeader(401)
+			fmt.Fprint(w, `{"message":"Forbidden"}`)
+			logRequest(r, 401)
+		} else {
+			w.WriteHeader(404)
+			fmt.Fprint(w, `{"message":"Not Found"}`)
+			logRequest(r, 404)
+		}
+		return
+	}
+
+	if err := a.contentStore.Put(meta, r.Body); err != nil {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, `{"message":"Error: %s"}`, err)
+		return
+	}
+
+	logRequest(r, 200)
 }
 
 // Represent takes a RequestVars and Meta and turns it into a Representation suitable
@@ -180,7 +199,7 @@ func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representatio
 	rep.Links["download"] = &link{Href: rv.ObjectLink()}
 	if upload {
 		header := make(map[string]string)
-		header["Accept"] = metaMediaType
+		header["Accept"] = contentMediaType
 		header["Authorization"] = rv.Authorization
 		rep.Links["upload"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
