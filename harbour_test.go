@@ -222,6 +222,35 @@ func TestPostUnauthed(t *testing.T) {
 }
 
 func TestPut(t *testing.T) {
+	req, err := http.NewRequest("PUT", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.SetBasicAuth(testUser, testPass)
+	req.Header.Set("Accept", contentMediaType)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Body = ioutil.NopCloser(bytes.NewBuffer([]byte("this is my content")))
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
+	}
+
+	r, err := testContentStore.Get(&Meta{Oid: authedOid})
+	if err != nil {
+		t.Fatalf("error retreiving from content store: %s", err)
+	}
+	content, err := ioutil.ReadAll(r)
+	if err != nil {
+		t.Fatalf("error reading content: %s", err)
+	}
+	if string(content) != "this is my content" {
+		t.Fatalf("expected content, got `%s`", string(content))
+	}
 }
 
 func TestMediaTypesRequired(t *testing.T) {
