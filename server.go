@@ -196,7 +196,7 @@ func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representatio
 		Links: make(map[string]*link),
 	}
 
-	rep.Links["download"] = &link{Href: rv.ObjectLink()}
+	rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: map[string]string{"Accept": contentMediaType}}
 	if upload {
 		header := make(map[string]string)
 		header["Accept"] = contentMediaType
