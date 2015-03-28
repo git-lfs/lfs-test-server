@@ -90,15 +90,13 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
+		writeStatus(w, r, 404, "")
 		return
 	}
 
 	content, err := a.contentStore.Get(meta)
 	if err != nil {
-		w.WriteHeader(404)
-		logRequest(r, 404)
+		writeStatus(w, r, 404, "")
 		return
 	}
 
@@ -112,13 +110,9 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		if isAuthError(err) {
-			w.WriteHeader(401)
-			fmt.Fprintf(w, forbiddenMsg)
-			logRequest(r, 401)
+			writeStatus(w, r, 401, forbiddenMsg)
 		} else {
-			w.WriteHeader(404)
-			fmt.Fprint(w, notFoundMsg)
-			logRequest(r, 404)
+			writeStatus(w, r, 404, notFoundMsg)
 		}
 		return
 	}
@@ -139,13 +133,9 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Put(rv)
 	if err != nil {
 		if isAuthError(err) {
-			w.WriteHeader(401)
-			fmt.Fprint(w, forbiddenMsg)
-			logRequest(r, 401)
+			writeStatus(w, r, 401, forbiddenMsg)
 		} else {
-			w.WriteHeader(404)
-			fmt.Fprint(w, notFoundMsg)
-			logRequest(r, 404)
+			writeStatus(w, r, 404, notFoundMsg)
 		}
 		return
 	}
@@ -169,20 +159,15 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		if isAuthError(err) {
-			w.WriteHeader(401)
-			fmt.Fprint(w, forbiddenMsg)
-			logRequest(r, 401)
+			writeStatus(w, r, 401, forbiddenMsg)
 		} else {
-			w.WriteHeader(404)
-			fmt.Fprint(w, notFoundMsg)
-			logRequest(r, 404)
+			writeStatus(w, r, 404, notFoundMsg)
 		}
 		return
 	}
 
 	if err := a.contentStore.Put(meta, r.Body); err != nil {
-		w.WriteHeader(500)
-		fmt.Fprintf(w, errMsg, err)
+		writeStatus(w, r, 500, errMsg, err)
 		return
 	}
 
@@ -237,6 +222,12 @@ func unpack(r *http.Request) *RequestVars {
 	}
 
 	return rv
+}
+
+func writeStatus(w http.ResponseWriter, r *http.Request, status int, format string, a ...interface{}) {
+	w.WriteHeader(status)
+	fmt.Fprintf(w, format, a)
+	logRequest(r, status)
 }
 
 func logRequest(r *http.Request, status int) {
