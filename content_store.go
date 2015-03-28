@@ -77,6 +77,14 @@ func (s *ContentStore) Put(meta *Meta, r io.Reader) error {
 	return nil
 }
 
+func (s *ContentStore) Exists(meta *Meta) bool {
+	path := filepath.Join(s.basePath, transformKey(meta.Oid))
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func transformKey(key string) string {
 	if len(key) < 5 {
 		return key

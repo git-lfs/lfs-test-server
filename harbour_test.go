@@ -139,9 +139,8 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
 	}
 
-	download := meta.Links["download"]
-	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+nonexistingOid {
-		t.Fatalf("expected download link, got %s", download.Href)
+	if download, ok := meta.Links["download"]; ok {
+		t.Fatalf("expected POST to not contain a download link, got %s", download.Href)
 	}
 
 	upload, ok := meta.Links["upload"]

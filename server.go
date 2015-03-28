@@ -8,6 +8,12 @@ import (
 	"net/http"
 )
 
+const (
+	forbiddenMsg = `{"message":"Forbidden"}`
+	notFoundMsg  = `{"message":"Not Found"}`
+	errMsg       = `{"message":"%s"}`
+)
+
 // RequestVars contain variables from the HTTP request. Variables from routing, json body decoding, and
 // some headers are stored.
 type RequestVars struct {
@@ -107,11 +113,11 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if isAuthError(err) {
 			w.WriteHeader(401)
-			fmt.Fprintf(w, `{"message":"Forbidden"}`)
+			fmt.Fprintf(w, forbiddenMsg)
 			logRequest(r, 401)
 		} else {
 			w.WriteHeader(404)
-			fmt.Fprint(w, `{"message":"Not Found"}`)
+			fmt.Fprint(w, notFoundMsg)
 			logRequest(r, 404)
 		}
 		return
@@ -121,7 +127,7 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		enc := json.NewEncoder(w)
-		enc.Encode(a.Represent(rv, meta, false))
+		enc.Encode(a.Represent(rv, meta, true, false))
 	}
 
 	logRequest(r, 200)
@@ -134,11 +140,11 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if isAuthError(err) {
 			w.WriteHeader(401)
-			fmt.Fprint(w, `{"message":"Forbidden"}`)
+			fmt.Fprint(w, forbiddenMsg)
 			logRequest(r, 401)
 		} else {
 			w.WriteHeader(404)
-			fmt.Fprint(w, `{"message":"Not Found"}`)
+			fmt.Fprint(w, notFoundMsg)
 			logRequest(r, 404)
 		}
 		return
@@ -146,14 +152,14 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	sentStatus := 200
-	if !meta.existing {
-		sentStatus = 201
-		w.WriteHeader(201)
+	sentStatus := 201
+	if meta.existing && a.contentStore.Exists(meta) {
+		sentStatus = 200
 	}
+	w.WriteHeader(sentStatus)
 
 	enc := json.NewEncoder(w)
-	enc.Encode(a.Represent(rv, meta, true))
+	enc.Encode(a.Represent(rv, meta, meta.existing, true))
 	logRequest(r, sentStatus)
 }
 
@@ -164,11 +170,11 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if isAuthError(err) {
 			w.WriteHeader(401)
-			fmt.Fprint(w, `{"message":"Forbidden"}`)
+			fmt.Fprint(w, forbiddenMsg)
 			logRequest(r, 401)
 		} else {
 			w.WriteHeader(404)
-			fmt.Fprint(w, `{"message":"Not Found"}`)
+			fmt.Fprint(w, notFoundMsg)
 			logRequest(r, 404)
 		}
 		return
@@ -176,7 +182,7 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := a.contentStore.Put(meta, r.Body); err != nil {
 		w.WriteHeader(500)
-		fmt.Fprintf(w, `{"message":"Error: %s"}`, err)
+		fmt.Fprintf(w, errMsg, err)
 		return
 	}
 
@@ -185,14 +191,17 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 // Represent takes a RequestVars and Meta and turns it into a Representation suitable
 // for json encoding
-func (a *App) Represent(rv *RequestVars, meta *Meta, upload bool) *Representation {
+func (a *App) Represent(rv *RequestVars, meta *Meta, download, upload bool) *Representation {
 	rep := &Representation{
 		Oid:   meta.Oid,
 		Size:  meta.Size,
 		Links: make(map[string]*link),
 	}
 
-	rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: map[string]string{"Accept": contentMediaType}}
+	if download {
+		rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: map[string]string{"Accept": contentMediaType}}
+	}
+
 	if upload {
 		header := make(map[string]string)
 		header["Accept"] = contentMediaType
