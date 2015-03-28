@@ -12,7 +12,7 @@ import (
 )
 
 func TestGetAuthed(t *testing.T) {
-	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -33,13 +33,13 @@ func TestGetAuthed(t *testing.T) {
 		t.Fatalf("expected response to contain content, got error: %s", err)
 	}
 
-	if string(by) != "content" {
+	if string(by) != content {
 		t.Fatalf("expected content to be `content`, got: %s", string(by))
 	}
 }
 
 func TestGetUnauthed(t *testing.T) {
-	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -56,7 +56,7 @@ func TestGetUnauthed(t *testing.T) {
 }
 
 func TestGetMetaAuthed(t *testing.T) {
-	req, err := http.NewRequest("GET", lfsServer.URL+"/bilbo/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/bilbo/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -76,22 +76,22 @@ func TestGetMetaAuthed(t *testing.T) {
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&meta)
 
-	if meta.Oid != authedOid {
-		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", authedOid, meta.Oid)
+	if meta.Oid != contentOid {
+		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", contentOid, meta.Oid)
 	}
 
-	if meta.Size != 1234 {
-		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
+	if meta.Size != contentSize {
+		t.Fatalf("expected to see a size of `%d`, got: `%d`", contentSize, meta.Size)
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+authedOid {
+	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+contentOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 }
 
 func TestGetMetaUnauthed(t *testing.T) {
-	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -162,7 +162,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	req.SetBasicAuth(testUser, testPass)
 	req.Header.Set("Accept", metaMediaType)
 
-	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, authedOid))
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":%d}`, contentOid, contentSize))
 	req.Body = ioutil.NopCloser(buf)
 
 	res, err := http.DefaultClient.Do(req)
@@ -178,16 +178,16 @@ func TestPostAuthedExistingObject(t *testing.T) {
 	dec := json.NewDecoder(res.Body)
 	dec.Decode(&meta)
 
-	if meta.Oid != authedOid {
-		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", authedOid, meta.Oid)
+	if meta.Oid != contentOid {
+		t.Fatalf("expected to see oid `%s` in meta, got: `%s`", contentOid, meta.Oid)
 	}
 
-	if meta.Size != 1234 {
-		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
+	if meta.Size != contentSize {
+		t.Fatalf("expected to see a size of `%d`, got: `%d`", contentSize, meta.Size)
 	}
 
 	download := meta.Links["download"]
-	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+authedOid {
+	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+contentOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
@@ -196,7 +196,7 @@ func TestPostAuthedExistingObject(t *testing.T) {
 		t.Fatalf("expected upload link to be present")
 	}
 
-	if upload.Href != "http://localhost:8080/bilbo/repo/objects/"+authedOid {
+	if upload.Href != "http://localhost:8080/bilbo/repo/objects/"+contentOid {
 		t.Fatalf("expected upload link, got %s", upload.Href)
 	}
 }
@@ -208,7 +208,7 @@ func TestPostUnauthed(t *testing.T) {
 	}
 	req.Header.Set("Accept", metaMediaType)
 
-	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":1234}`, authedOid))
+	buf := bytes.NewBufferString(fmt.Sprintf(`{"oid":"%s", "size":%d}`, contentOid, contentSize))
 	req.Body = ioutil.NopCloser(buf)
 
 	res, err := http.DefaultClient.Do(req)
@@ -222,14 +222,14 @@ func TestPostUnauthed(t *testing.T) {
 }
 
 func TestPut(t *testing.T) {
-	req, err := http.NewRequest("PUT", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("PUT", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
 	req.SetBasicAuth(testUser, testPass)
 	req.Header.Set("Accept", contentMediaType)
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Body = ioutil.NopCloser(bytes.NewBuffer([]byte("this is my content")))
+	req.Body = ioutil.NopCloser(bytes.NewBuffer([]byte(content)))
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -240,23 +240,23 @@ func TestPut(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 
-	r, err := testContentStore.Get(&Meta{Oid: authedOid})
+	r, err := testContentStore.Get(&Meta{Oid: contentOid})
 	if err != nil {
 		t.Fatalf("error retreiving from content store: %s", err)
 	}
-	content, err := ioutil.ReadAll(r)
+	c, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatalf("error reading content: %s", err)
 	}
-	if string(content) != "this is my content" {
-		t.Fatalf("expected content, got `%s`", string(content))
+	if string(c) != content {
+		t.Fatalf("expected content, got `%s`", string(c))
 	}
 }
 
 func TestMediaTypesRequired(t *testing.T) {
 	m := []string{"GET", "PUT", "POST", "HEAD"}
 	for _, method := range m {
-		req, err := http.NewRequest(method, lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+		req, err := http.NewRequest(method, lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 		if err != nil {
 			t.Fatalf("request error: %s", err)
 		}
@@ -273,7 +273,7 @@ func TestMediaTypesRequired(t *testing.T) {
 }
 
 func TestMediaTypesParsed(t *testing.T) {
-	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+authedOid, nil)
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
 		t.Fatalf("request error: %s", err)
 	}
@@ -296,7 +296,9 @@ var (
 	testContentStore *ContentStore
 	testUser         = "bilbo"
 	testPass         = "baggins"
-	authedOid        = "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072"
+	content          = "this is my content"
+	contentSize      = int64(len(content))
+	contentOid       = "f97e1b2936a56511b3b6efc99011758e4700d60fb1674d31445d1ee40b663f24"
 	nonexistingOid   = "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f"
 )
 
@@ -348,7 +350,7 @@ func seedMetaStore() error {
 		return err
 	}
 
-	rv := &RequestVars{User: testUser, Password: testPass, Oid: authedOid, Size: 1234}
+	rv := &RequestVars{User: testUser, Password: testPass, Oid: contentOid, Size: contentSize}
 	if _, err := testMetaStore.Put(rv); err != nil {
 		return err
 	}
@@ -357,8 +359,8 @@ func seedMetaStore() error {
 }
 
 func seedContentStore() error {
-	meta := &Meta{Oid: authedOid}
-	buf := bytes.NewBuffer([]byte("content"))
+	meta := &Meta{Oid: contentOid, Size: contentSize}
+	buf := bytes.NewBuffer([]byte(content))
 	if err := testContentStore.Put(meta, buf); err != nil {
 		return err
 	}

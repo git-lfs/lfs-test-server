@@ -1,9 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+)
+
+var (
+	errHashMismatch = errors.New("Content has does not match OID")
+	errSizeMismatch = errors.New("Content size does not match")
 )
 
 // ContentStore provides a simple file system based storage.
@@ -44,10 +52,24 @@ func (s *ContentStore) Put(meta *Meta, r io.Reader) error {
 	}
 	defer os.Remove(tmpPath)
 
-	if _, err := io.Copy(file, r); err != nil {
+	hash := sha256.New()
+	hw := io.MultiWriter(hash, file)
+
+	written, err := io.Copy(hw, r)
+	if err != nil {
+		file.Close()
 		return err
 	}
 	file.Close()
+
+	if written != meta.Size {
+		return errSizeMismatch
+	}
+
+	shaStr := hex.EncodeToString(hash.Sum(nil))
+	if shaStr != meta.Oid {
+		return errHashMismatch
+	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
 		return err
