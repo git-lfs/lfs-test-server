@@ -17,18 +17,14 @@ type RequestVars struct {
 	Password      string
 	Repo          string
 	Authorization string
-	PathPrefix    string
-	Status        int64
-	Body          string
 	RequestID     string
 }
 
 // Meta is object metadata as seen by the object and metadata stores.
 type Meta struct {
-	Oid        string `json:"oid"`
-	Size       int64  `json:"size"`
-	PathPrefix string `json:"path_prefix"`
-	existing   bool
+	Oid      string `json:"oid"`
+	Size     int64  `json:"size"`
+	existing bool
 }
 
 // Representation is object medata as seen by clients of harbour.
@@ -216,7 +212,6 @@ func unpack(r *http.Request) *RequestVars {
 		Repo:          vars["repo"],
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
-		PathPrefix:    r.Header.Get("PathPrefix"),
 		RequestID:     vars["request_id"],
 	}
 
@@ -230,8 +225,6 @@ func unpack(r *http.Request) *RequestVars {
 
 		rv.Oid = p.Oid
 		rv.Size = p.Size
-		rv.Status = p.Status
-		rv.Body = p.Body
 	}
 
 	return rv
