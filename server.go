@@ -30,7 +30,7 @@ type RequestVars struct {
 type Meta struct {
 	Oid      string `json:"oid"`
 	Size     int64  `json:"size"`
-	existing bool
+	Existing bool
 }
 
 // Representation is object medata as seen by clients of harbour.
@@ -143,13 +143,13 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", metaMediaType)
 
 	sentStatus := 201
-	if meta.existing && a.contentStore.Exists(meta) {
+	if meta.Existing && a.contentStore.Exists(meta) {
 		sentStatus = 200
 	}
 	w.WriteHeader(sentStatus)
 
 	enc := json.NewEncoder(w)
-	enc.Encode(a.Represent(rv, meta, meta.existing, true))
+	enc.Encode(a.Represent(rv, meta, meta.Existing, true))
 	logRequest(r, sentStatus)
 }
 

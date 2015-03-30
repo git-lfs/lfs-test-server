@@ -92,7 +92,7 @@ func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
 
 	// Check if it exists first
 	if meta, err := s.Get(v); err == nil {
-		meta.existing = true
+		meta.Existing = true
 		return meta, nil
 	}
 
