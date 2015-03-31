@@ -77,6 +77,7 @@ func (s *ContentStore) Put(meta *Meta, r io.Reader) error {
 	return nil
 }
 
+// Exists returns true if the object exists in the content store.
 func (s *ContentStore) Exists(meta *Meta) bool {
 	path := filepath.Join(s.basePath, transformKey(meta.Oid))
 	if _, err := os.Stat(path); os.IsNotExist(err) {

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
+
+	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -23,7 +28,6 @@ type RequestVars struct {
 	Password      string
 	Repo          string
 	Authorization string
-	RequestID     string
 }
 
 // Meta is object metadata as seen by the object and metadata stores.
@@ -54,7 +58,7 @@ type link struct {
 
 // App links a Router, ContentStore, and MetaStore to provide the LFS server.
 type App struct {
-	router       *Router
+	router       *mux.Router
 	contentStore *ContentStore
 	metaStore    *MetaStore
 }
@@ -63,26 +67,33 @@ type App struct {
 func NewApp(content *ContentStore, meta *MetaStore) *App {
 	app := &App{contentStore: content, metaStore: meta}
 
-	r := NewRouter()
+	r := mux.NewRouter()
 
-	s := r.Route("/{user}/{repo}/objects/{oid}")
-	s.Get(contentMediaType, app.GetContentHandler)
-	s.Head(contentMediaType, app.GetContentHandler)
-	s.Get(metaMediaType, app.GetMetaHandler)
-	s.Head(metaMediaType, app.GetMetaHandler)
-	s.Put(contentMediaType, app.PutHandler)
+	route := "/{user}/{repo}/objects/{oid}"
+	r.HandleFunc(route, app.GetContentHandler).Methods("GET", "HEAD").MatcherFunc(ContentMatcher)
+	r.HandleFunc(route, app.GetMetaHandler).Methods("GET", "HEAD").MatcherFunc(MetaMatcher)
+	r.HandleFunc(route, app.PutHandler).Methods("PUT").MatcherFunc(ContentMatcher)
 
-	o := r.Route("/{user}/{repo}/objects")
-	o.Post(metaMediaType, app.PostHandler)
+	r.HandleFunc("/{user}/{repo}/objects", app.PostHandler).Methods("POST").MatcherFunc(MetaMatcher)
 
 	app.router = r
 
 	return app
 }
 
+func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err == nil {
+		context.Set(r, "RequestID", fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]))
+	}
+
+	a.router.ServeHTTP(w, r)
+}
+
 // Serve calls http.Serve with the provided Listener and the app's router
 func (a *App) Serve(l net.Listener) error {
-	return http.Serve(l, a.router)
+	return http.Serve(l, a)
 }
 
 // GetContentHandler gets the content from the content store
@@ -196,8 +207,24 @@ func (a *App) Represent(rv *RequestVars, meta *Meta, download, upload bool) *Rep
 	return rep
 }
 
+// ContentMatcher provides a mux.MatcherFunc that only allows requests that contain
+// an Accept header with the contentMediaType
+func ContentMatcher(r *http.Request, m *mux.RouteMatch) bool {
+	mediaParts := strings.Split(r.Header.Get("Accept"), ";")
+	mt := mediaParts[0]
+	return mt == contentMediaType
+}
+
+// MetaMatcher provides a mux.MatcherFunc that only allows requests that contain
+// an Accept header with the metaMediaType
+func MetaMatcher(r *http.Request, m *mux.RouteMatch) bool {
+	mediaParts := strings.Split(r.Header.Get("Accept"), ";")
+	mt := mediaParts[0]
+	return mt == metaMediaType
+}
+
 func unpack(r *http.Request) *RequestVars {
-	vars := Vars(r)
+	vars := mux.Vars(r)
 	user, pass, _ := r.BasicAuth()
 
 	rv := &RequestVars{
@@ -206,7 +233,6 @@ func unpack(r *http.Request) *RequestVars {
 		Repo:          vars["repo"],
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
-		RequestID:     vars["request_id"],
 	}
 
 	if r.Method == "POST" { // Maybe also check if +json
@@ -231,7 +257,7 @@ func writeStatus(w http.ResponseWriter, r *http.Request, status int, format stri
 }
 
 func logRequest(r *http.Request, status int) {
-	logger.Log(kv{"method": r.Method, "url": r.URL, "status": status, "request_id": Vars(r)["request_id"]})
+	logger.Log(kv{"method": r.Method, "url": r.URL, "status": status, "request_id": context.Get(r, "RequestID")})
 }
 
 func isAuthError(err error) bool {
