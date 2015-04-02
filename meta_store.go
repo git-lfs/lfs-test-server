@@ -150,6 +150,46 @@ func (s *MetaStore) AddUser(user, pass string) error {
 	return err
 }
 
+// DeleteUser removes user credentials from the meta store.
+func (s *MetaStore) DeleteUser(user string) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(usersBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		err := bucket.Delete([]byte(user))
+		return err
+	})
+
+	return err
+}
+
+// MetaUser encapsulates information about a meta store user
+type MetaUser struct {
+	Name string
+}
+
+// Users returns all MetaUsers in the meta store
+func (s *MetaStore) Users() ([]*MetaUser, error) {
+	var users []*MetaUser
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(usersBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		bucket.ForEach(func(k, v []byte) error {
+			users = append(users, &MetaUser{string(k)})
+			return nil
+		})
+		return nil
+	})
+
+	return users, err
+}
+
 // authenticate uses the authorization string to determine whether
 // or not to proceed. This server assumes an HTTP Basic auth format.
 func (s *MetaStore) authenticate(authorization string) bool {

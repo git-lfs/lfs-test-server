@@ -76,6 +76,8 @@ func NewApp(content *ContentStore, meta *MetaStore) *App {
 
 	r.HandleFunc("/{user}/{repo}/objects", app.PostHandler).Methods("POST").MatcherFunc(MetaMatcher)
 
+	app.addMgmt(r)
+
 	app.router = r
 
 	return app

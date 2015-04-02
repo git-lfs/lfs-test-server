@@ -16,6 +16,8 @@ type Configuration struct {
 	Scheme      string `config:"https"`
 	MetaDB      string `config:"lfs.db"`
 	ContentPath string `config:"lfs-content"`
+	AdminUser   string `config:""`
+	AdminPass   string `config:""`
 }
 
 // Config is the global app configuration
