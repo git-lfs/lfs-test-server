@@ -103,7 +103,11 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
-		writeStatus(w, r, 404, "")
+		if isAuthError(err) {
+			requireAuth(w, r)
+		} else {
+			writeStatus(w, r, 404, notFoundMsg)
+		}
 		return
 	}
 
@@ -123,7 +127,7 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		if isAuthError(err) {
-			writeStatus(w, r, 401, forbiddenMsg)
+			requireAuth(w, r)
 		} else {
 			writeStatus(w, r, 404, notFoundMsg)
 		}
@@ -146,7 +150,7 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Put(rv)
 	if err != nil {
 		if isAuthError(err) {
-			writeStatus(w, r, 401, forbiddenMsg)
+			requireAuth(w, r)
 		} else {
 			writeStatus(w, r, 404, notFoundMsg)
 		}
@@ -155,7 +159,7 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	sentStatus := 201
+	sentStatus := 202
 	if meta.Existing && a.contentStore.Exists(meta) {
 		sentStatus = 200
 	}
@@ -172,7 +176,7 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	meta, err := a.metaStore.Get(rv)
 	if err != nil {
 		if isAuthError(err) {
-			writeStatus(w, r, 401, forbiddenMsg)
+			requireAuth(w, r)
 		} else {
 			writeStatus(w, r, 404, notFoundMsg)
 		}
@@ -267,4 +271,9 @@ func isAuthError(err error) bool {
 		return ae.AuthError()
 	}
 	return false
+}
+
+func requireAuth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Basic realm=git-lfs-server")
+	writeStatus(w, r, 401, forbiddenMsg)
 }

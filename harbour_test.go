@@ -51,8 +51,8 @@ func TestGetUnauthed(t *testing.T) {
 		t.Fatalf("response error: %s", err)
 	}
 
-	if res.StatusCode != 404 {
-		t.Fatalf("expected status 404, got %d %s", res.StatusCode, req.URL)
+	if res.StatusCode != 401 {
+		t.Fatalf("expected status 401, got %d %s", res.StatusCode, req.URL)
 	}
 }
 
@@ -124,8 +124,8 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatalf("response error: %s", err)
 	}
 
-	if res.StatusCode != 201 {
-		t.Fatalf("expected status 201, got %d", res.StatusCode)
+	if res.StatusCode != 202 {
+		t.Fatalf("expected status 202, got %d", res.StatusCode)
 	}
 
 	var meta Representation
