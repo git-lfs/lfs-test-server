@@ -75,7 +75,7 @@ func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/mgmt", 301)
+	http.Redirect(w, r, "/mgmt", 302)
 }
 
 func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +90,7 @@ func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/mgmt", 301)
+	http.Redirect(w, r, "/mgmt", 302)
 }
 
 func authenticate(r *http.Request) error {
