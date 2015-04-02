@@ -225,11 +225,8 @@ func MetaMatcher(r *http.Request, m *mux.RouteMatch) bool {
 
 func unpack(r *http.Request) *RequestVars {
 	vars := mux.Vars(r)
-	user, pass, _ := r.BasicAuth()
-
 	rv := &RequestVars{
-		User:          user,
-		Password:      pass,
+		User:          vars["user"],
 		Repo:          vars["repo"],
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),

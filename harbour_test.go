@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -295,6 +296,8 @@ var (
 	testContentStore *ContentStore
 	testUser         = "bilbo"
 	testPass         = "baggins"
+	testAuth         = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(testUser+":"+testPass)))
+	badAuth          = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte("azog:defiler")))
 	content          = "this is my content"
 	contentSize      = int64(len(content))
 	contentOid       = "f97e1b2936a56511b3b6efc99011758e4700d60fb1674d31445d1ee40b663f24"
@@ -349,7 +352,7 @@ func seedMetaStore() error {
 		return err
 	}
 
-	rv := &RequestVars{User: testUser, Password: testPass, Oid: contentOid, Size: contentSize}
+	rv := &RequestVars{Authorization: testAuth, Oid: contentOid, Size: contentSize}
 	if _, err := testMetaStore.Put(rv); err != nil {
 		return err
 	}

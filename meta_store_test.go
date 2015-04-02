@@ -14,7 +14,7 @@ func TestGetWithAuth(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	meta, err := metaStoreTest.Get(&RequestVars{User: testUser, Password: testPass, Oid: contentOid})
+	meta, err := metaStoreTest.Get(&RequestVars{Authorization: testAuth, Oid: contentOid})
 	if err != nil {
 		t.Fatalf("Error retreiving meta: %s", err)
 	}
@@ -32,7 +32,7 @@ func TestGetWithoutAuth(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	_, err := metaStoreTest.Get(&RequestVars{User: "cat", Password: "dog", Oid: contentOid})
+	_, err := metaStoreTest.Get(&RequestVars{Authorization: badAuth, Oid: contentOid})
 	if !isAuthError(err) {
 		t.Errorf("expected auth error, got: %s", err)
 	}
@@ -42,7 +42,7 @@ func TestPutWithAuth(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	meta, err := metaStoreTest.Put(&RequestVars{User: testUser, Password: testPass, Oid: nonexistingOid, Size: 42})
+	meta, err := metaStoreTest.Put(&RequestVars{Authorization: testAuth, Oid: nonexistingOid, Size: 42})
 	if err != nil {
 		t.Errorf("expected put to succeed, got : %s", err)
 	}
@@ -51,7 +51,7 @@ func TestPutWithAuth(t *testing.T) {
 		t.Errorf("expected meta to not have existed")
 	}
 
-	meta, err = metaStoreTest.Get(&RequestVars{User: testUser, Password: testPass, Oid: nonexistingOid})
+	meta, err = metaStoreTest.Get(&RequestVars{Authorization: testAuth, Oid: nonexistingOid})
 	if err != nil {
 		t.Errorf("expected to be able to retreive new put, got : %s", err)
 	}
@@ -64,7 +64,7 @@ func TestPutWithAuth(t *testing.T) {
 		t.Errorf("expected sizes to match, got: %d", meta.Size)
 	}
 
-	meta, err = metaStoreTest.Put(&RequestVars{User: testUser, Password: testPass, Oid: nonexistingOid, Size: 42})
+	meta, err = metaStoreTest.Put(&RequestVars{Authorization: testAuth, Oid: nonexistingOid, Size: 42})
 	if err != nil {
 		t.Errorf("expected put to succeed, got : %s", err)
 	}
@@ -78,7 +78,7 @@ func TestPuthWithoutAuth(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	_, err := metaStoreTest.Put(&RequestVars{User: "cat", Password: "dog", Oid: contentOid, Size: 42})
+	_, err := metaStoreTest.Put(&RequestVars{Authorization: badAuth, Oid: contentOid, Size: 42})
 	if !isAuthError(err) {
 		t.Errorf("expected auth error, got: %s", err)
 	}
@@ -98,7 +98,7 @@ func setupMeta() {
 		os.Exit(1)
 	}
 
-	rv := &RequestVars{User: testUser, Password: testPass, Oid: contentOid, Size: contentSize}
+	rv := &RequestVars{Authorization: testAuth, Oid: contentOid, Size: contentSize}
 	if _, err := metaStoreTest.Put(rv); err != nil {
 		teardownMeta()
 		fmt.Printf("error seeding test meta store: %s\n", err)
