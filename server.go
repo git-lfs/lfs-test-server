@@ -13,12 +13,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	forbiddenMsg = `{"message":"Forbidden"}`
-	notFoundMsg  = `{"message":"Not Found"}`
-	errMsg       = `{"message":"%s"}`
-)
-
 // RequestVars contain variables from the HTTP request. Variables from routing, json body decoding, and
 // some headers are stored.
 type RequestVars struct {
@@ -106,14 +100,14 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		if isAuthError(err) {
 			requireAuth(w, r)
 		} else {
-			writeStatus(w, r, 404, notFoundMsg)
+			writeStatus(w, r, 404)
 		}
 		return
 	}
 
 	content, err := a.contentStore.Get(meta)
 	if err != nil {
-		writeStatus(w, r, 404, "")
+		writeStatus(w, r, 404)
 		return
 	}
 
@@ -129,7 +123,7 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 		if isAuthError(err) {
 			requireAuth(w, r)
 		} else {
-			writeStatus(w, r, 404, notFoundMsg)
+			writeStatus(w, r, 404)
 		}
 		return
 	}
@@ -152,7 +146,7 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 		if isAuthError(err) {
 			requireAuth(w, r)
 		} else {
-			writeStatus(w, r, 404, notFoundMsg)
+			writeStatus(w, r, 404)
 		}
 		return
 	}
@@ -178,13 +172,14 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 		if isAuthError(err) {
 			requireAuth(w, r)
 		} else {
-			writeStatus(w, r, 404, notFoundMsg)
+			writeStatus(w, r, 404)
 		}
 		return
 	}
 
 	if err := a.contentStore.Put(meta, r.Body); err != nil {
-		writeStatus(w, r, 500, errMsg, err)
+		w.WriteHeader(500)
+		fmt.Fprintf(w, `{"message":"%s"}`, err)
 		return
 	}
 
@@ -253,9 +248,17 @@ func unpack(r *http.Request) *RequestVars {
 	return rv
 }
 
-func writeStatus(w http.ResponseWriter, r *http.Request, status int, format string, a ...interface{}) {
+func writeStatus(w http.ResponseWriter, r *http.Request, status int) {
+	message := http.StatusText(status)
+
+	mediaParts := strings.Split(r.Header.Get("Accept"), ";")
+	mt := mediaParts[0]
+	if strings.HasSuffix(mt, "+json") {
+		message = `{"message":"` + message + `"}`
+	}
+
 	w.WriteHeader(status)
-	fmt.Fprintf(w, format, a)
+	fmt.Fprint(w, message)
 	logRequest(r, status)
 }
 
@@ -275,5 +278,5 @@ func isAuthError(err error) bool {
 
 func requireAuth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("WWW-Authenticate", "Basic realm=git-lfs-server")
-	writeStatus(w, r, 401, forbiddenMsg)
+	writeStatus(w, r, 401)
 }
