@@ -1,3 +1,3 @@
 FROM golang:1.4-onbuild
-MAINTAINER Scott Barron <rubyist@github.com>
+MAINTAINER GitHub, Inc.
 EXPOSE 8080
