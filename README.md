@@ -1,11 +1,15 @@
 Harbour
 ======
 
-Harbour is a simple sever that implements the [Git LFS](https://github.com/github/git-lfs) API. Harbour is intended
-to be used for testing the Git LFS client and is not in a production ready
+[rel]: https://github.com/github/harbour/releases
+[lfs]: https://github.com/github/git-lfs
+[api]: https://github.com/github/git-lfs/blob/master/docs/api.md
+
+Harbour is an example server that implements the [Git LFS API][api]. It is intended
+to be used for testing the [Git LFS][lfs] client and is not in a production ready
 state.
 
-Harbour is written in Go, with pre-compiled binaries available vor Mac,
+Harbour is written in Go, with pre-compiled binaries available for Mac,
 Windows, Linux, and FreeBSD.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for info on working on Harbour and
@@ -54,4 +58,3 @@ To use the harbour server with the Git LFS client, configure it in the repositor
   [lfs]
     url = "http://localhost:8080/janedoe/lfsrepo"
 ```
-
