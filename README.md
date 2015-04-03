@@ -52,6 +52,6 @@ To use the harbour server with the Git LFS client, configure it in the repositor
 
 ```
   [lfs]
-    url = "http://localhost:8080/janedoe/lfsrepo
+    url = "http://localhost:8080/janedoe/lfsrepo"
 ```
 
