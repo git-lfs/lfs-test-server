@@ -36,6 +36,8 @@ them as separate pull requests.
 - [Using Pull Requests](https://help.github.com/articles/using-pull-requests/)
 - [GitHub Help](https://help.github.com)
 
+[![GoDoc](https://godoc.org/github.com/github/harbour?status.svg)](https://godoc.org/github.com/github/harbour)
+
 [fork]: https://github.com/github/harbour/fork
 [pr]: https://github.com/github/harbour/compare
 [style]: https://github.com/golang/go/wiki/CodeReviewComments
