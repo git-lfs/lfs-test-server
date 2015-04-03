@@ -17,14 +17,18 @@ Download the [latest version][rel]. It is a single binary file.
 
 Alternatively, use the Go installer:
 
+```
   $ go install github.com/github/harbour
+```
 
 
 ## Building
 
 To build from source, use the Go tools:
 
+```
   $ go get github.com/github/harbour
+```
 
 
 ## Running
@@ -46,6 +50,8 @@ rudimentary admin interface can be accessed via
 
 To use the harbour server with the Git LFS client, configure it in the repository's `.gitconfig` file:
 
+```
   [lfs]
     url = "http://localhost:8080/janedoe/lfsrepo
+```
 
