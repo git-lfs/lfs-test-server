@@ -1,6 +1,6 @@
 #!/bin/sh
 
-go build
+go build -o lfs-test-server
 rc=$?; if [[ $rc != 0 ]]; then echo "Build failed."; exit $rc; fi
 version=$(./lfs-test-server -v)
 
