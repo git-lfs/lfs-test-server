@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 const (
 	contentMediaType = "application/vnd.git-lfs"
 	metaMediaType    = contentMediaType + "+json"
+	version          = "0.1.0"
 )
 
 var (
@@ -17,6 +19,11 @@ var (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "-v" {
+		fmt.Println(version)
+		os.Exit(0)
+	}
+
 	tl, err := NewTrackingListener(Config.Listen)
 	if err != nil {
 		logger.Fatal(kv{"fn": "main", "err": "Could not create listener: " + err.Error()})
@@ -44,7 +51,7 @@ func main() {
 		}
 	}(c, tl)
 
-	logger.Log(kv{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen})
+	logger.Log(kv{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen, "version": version})
 
 	app := NewApp(contentStore, metaStore)
 	app.Serve(tl)
