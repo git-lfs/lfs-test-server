@@ -23,7 +23,7 @@ type Configuration struct {
 // Config is the global app configuration
 var Config = &Configuration{}
 
-const keyPrefix = "HARBOUR"
+const keyPrefix = "LFS"
 
 func init() {
 	te := reflect.TypeOf(Config).Elem()
@@ -46,7 +46,7 @@ func init() {
 	}
 
 	if port := os.Getenv("PORT"); port != "" {
-		// If $PORT is set, override HARBOUR_LISTEN. This is useful for deploying to Heroku.
+		// If $PORT is set, override LFS_LISTEN. This is useful for deploying to Heroku.
 		Config.Listen = "tcp://:" + port
 	}
 }

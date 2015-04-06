@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/github/harbour",
+	"ImportPath": "github.com/github/lfs-test-server",
 	"GoVersion": "go1.4.1",
 	"Deps": [
 		{

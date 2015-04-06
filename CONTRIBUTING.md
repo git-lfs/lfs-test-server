@@ -1,4 +1,4 @@
-## Contributing to Harbour
+## Contributing to LFS Test Server
 
 Hi there! We're thrilled that you'd like to contribute to this project. Your
 help is essential for keeping it great.
@@ -27,7 +27,7 @@ them as separate pull requests.
 
 0. Run `godep save` to add new dependencies.
 0. Run `godep update foo/bar` to update the package `foo/bar`.
-0. Commit the change.  harbour vendors the full source code in the repository.
+0. Commit the change.  lfs-test-server vendors the full source code in the repository.
 0. Submit a pull request.
 
 ## Resources
@@ -36,8 +36,8 @@ them as separate pull requests.
 - [Using Pull Requests](https://help.github.com/articles/using-pull-requests/)
 - [GitHub Help](https://help.github.com)
 
-[![GoDoc](https://godoc.org/github.com/github/harbour?status.svg)](https://godoc.org/github.com/github/harbour)
+[![GoDoc](https://godoc.org/github.com/github/lfs-test-server?status.svg)](https://godoc.org/github.com/github/lfs-test-server)
 
-[fork]: https://github.com/github/harbour/fork
-[pr]: https://github.com/github/harbour/compare
+[fork]: https://github.com/github/lfs-test-server/fork
+[pr]: https://github.com/github/lfs-test-server/compare
 [style]: https://github.com/golang/go/wiki/CodeReviewComments

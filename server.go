@@ -31,7 +31,7 @@ type Meta struct {
 	Existing bool
 }
 
-// Representation is object medata as seen by clients of harbour.
+// Representation is object medata as seen by clients of the lfs server.
 type Representation struct {
 	Oid   string           `json:"oid"`
 	Size  int64            `json:"size"`

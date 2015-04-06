@@ -2,7 +2,7 @@
 
 go build
 rc=$?; if [[ $rc != 0 ]]; then echo "Build failed."; exit $rc; fi
-version=$(./harbour -v)
+version=$(./lfs-test-server -v)
 
 while true; do
   read -p "Release version $version? [y/n] " yn
@@ -23,57 +23,57 @@ rm -rf dist
 mkdir dist
 
 echo "Building darwin amd64"
-mkdir -p dist/harbour-darwin-amd64
-GOPATH=`pwd`/Godeps/_workspace GOOS=darwin GOARCH=amd64 go build -o dist/harbour-darwin-amd64/harbour
-cp README.md dist/harbour-darwin-amd64
-cp LICENSE dist/harbour-darwin-amd64
-cd dist && tar zcf harbour-darwin-amd64-$version.tar.gz harbour-darwin-amd64; cd ..
+mkdir -p dist/lfs-test-server-darwin-amd64
+GOPATH=`pwd`/Godeps/_workspace GOOS=darwin GOARCH=amd64 go build -o dist/lfs-test-server-darwin-amd64/lfs-test-server
+cp README.md dist/lfs-test-server-darwin-amd64
+cp LICENSE dist/lfs-test-server-darwin-amd64
+cd dist && tar zcf lfs-test-server-darwin-amd64-$version.tar.gz lfs-test-server-darwin-amd64; cd ..
 
 echo "Building linux 386"
-mkdir -p dist/harbour-linux-386
-GOPATH=`pwd`/Godeps/_workspace GOOS=linux GOARCH=386 go build -o dist/harbour-linux-386/harbour
-cp README.md dist/harbour-linux-386
-cp LICENSE dist/harbour-linux-386
-cd dist && tar zcf harbour-linux-386-$version.tar.gz harbour-linux-386; cd ..
+mkdir -p dist/lfs-test-server-linux-386
+GOPATH=`pwd`/Godeps/_workspace GOOS=linux GOARCH=386 go build -o dist/lfs-test-server-linux-386/lfs-test-server
+cp README.md dist/lfs-test-server-linux-386
+cp LICENSE dist/lfs-test-server-linux-386
+cd dist && tar zcf lfs-test-server-linux-386-$version.tar.gz lfs-test-server-linux-386; cd ..
 
 echo "Building linux amd64"
-mkdir -p dist/harbour-linux-amd64
-GOPATH=`pwd`/Godeps/_workspace GOOS=linux GOARCH=amd64 go build -o dist/harbour-linux-amd64/harbour
-cp README.md dist/harbour-linux-amd64
-cp LICENSE dist/harbour-linux-amd64
-cd dist && tar zcf harbour-linux-amd64-$version.tar.gz harbour-linux-amd64; cd ..
+mkdir -p dist/lfs-test-server-linux-amd64
+GOPATH=`pwd`/Godeps/_workspace GOOS=linux GOARCH=amd64 go build -o dist/lfs-test-server-linux-amd64/lfs-test-server
+cp README.md dist/lfs-test-server-linux-amd64
+cp LICENSE dist/lfs-test-server-linux-amd64
+cd dist && tar zcf lfs-test-server-linux-amd64-$version.tar.gz lfs-test-server-linux-amd64; cd ..
 
 echo "Building freebsd 386"
-mkdir -p dist/harbour-freebsd-386
-GOPATH=`pwd`/Godeps/_workspace GOOS=freebsd GOARCH=386 go build -o dist/harbour-freebsd-386/harbour
-cp README.md dist/harbour-freebsd-386
-cp LICENSE dist/harbour-freebsd-386
-cd dist && tar zcf harbour-freebsd-386-$version.tar.gz harbour-freebsd-386; cd ..
+mkdir -p dist/lfs-test-server-freebsd-386
+GOPATH=`pwd`/Godeps/_workspace GOOS=freebsd GOARCH=386 go build -o dist/lfs-test-server-freebsd-386/lfs-test-server
+cp README.md dist/lfs-test-server-freebsd-386
+cp LICENSE dist/lfs-test-server-freebsd-386
+cd dist && tar zcf lfs-test-server-freebsd-386-$version.tar.gz lfs-test-server-freebsd-386; cd ..
 
 echo "Building freebsd amd64"
-mkdir -p dist/harbour-freebsd-amd64
-GOPATH=`pwd`/Godeps/_workspace GOOS=freebsd GOARCH=amd64 go build -o dist/harbour-freebsd-amd64/harbour
-cp README.md dist/harbour-freebsd-amd64
-cp LICENSE dist/harbour-freebsd-amd64
-cd dist && tar zcf harbour-freebsd-amd64-$version.tar.gz harbour-freebsd-amd64; cd ..
+mkdir -p dist/lfs-test-server-freebsd-amd64
+GOPATH=`pwd`/Godeps/_workspace GOOS=freebsd GOARCH=amd64 go build -o dist/lfs-test-server-freebsd-amd64/lfs-test-server
+cp README.md dist/lfs-test-server-freebsd-amd64
+cp LICENSE dist/lfs-test-server-freebsd-amd64
+cd dist && tar zcf lfs-test-server-freebsd-amd64-$version.tar.gz lfs-test-server-freebsd-amd64; cd ..
 
 echo "Building windows 386"
-mkdir -p dist/harbour-windows-386
-GOPATH=`pwd`/Godeps/_workspace GOOS=windows GOARCH=386 go build -o dist/harbour-windows-386/harbour.exe
-cp README.md dist/harbour-windows-386
-cp LICENSE dist/harbour-windows-386
-cd dist && zip -q -j harbour-windows-386-$version.zip harbour-windows-386/*; cd ..
+mkdir -p dist/lfs-test-server-windows-386
+GOPATH=`pwd`/Godeps/_workspace GOOS=windows GOARCH=386 go build -o dist/lfs-test-server-windows-386/lfs-test-server.exe
+cp README.md dist/lfs-test-server-windows-386
+cp LICENSE dist/lfs-test-server-windows-386
+cd dist && zip -q -j lfs-test-server-windows-386-$version.zip lfs-test-server-windows-386/*; cd ..
 
 echo "Building windows amd64"
-mkdir -p dist/harbour-windows-amd64
-GOPATH=`pwd`/Godeps/_workspace GOOS=windows GOARCH=amd64 go build -o dist/harbour-windows-amd64/harbour.exe
-cp README.md dist/harbour-windows-amd64
-cp LICENSE dist/harbour-windows-amd64
-cd dist && zip -q -j harbour-windows-amd64-$version.zip harbour-windows-amd64/*; cd ..
+mkdir -p dist/lfs-test-server-windows-amd64
+GOPATH=`pwd`/Godeps/_workspace GOOS=windows GOARCH=amd64 go build -o dist/lfs-test-server-windows-amd64/lfs-test-server.exe
+cp README.md dist/lfs-test-server-windows-amd64
+cp LICENSE dist/lfs-test-server-windows-amd64
+cd dist && zip -q -j lfs-test-server-windows-amd64-$version.zip lfs-test-server-windows-amd64/*; cd ..
 
 # Create the release
-tmpl=`mktemp harbour-release.XXXXXXXXX`
-out=`mktemp harbour-out.XXXXXXXX`
+tmpl=`mktemp lfs-test-server-release.XXXXXXXXX`
+out=`mktemp lfs-test-server-out.XXXXXXXX`
 payload=$(cat <<EOF
 {
   "tag_name": "v$version",
@@ -89,7 +89,7 @@ echo "$payload" > $tmpl
 
 ${EDITOR:-vim} $tmpl
 
-curl -n -X POST -d @$tmpl -o $out https://api.github.com/repos/github/harbour/releases
+curl -n -X POST -d @$tmpl -o $out https://api.github.com/repos/github/lfs-test-server/releases
 id=$(cat $out | jq -r ".id")
 
 if [[ $id == "null" ]]; then echo "Failed creating release."; cat $out; exit 1; fi
@@ -99,25 +99,25 @@ echo "Created release id: $id"
 # Upload each file to the release
 upload=$(cat $out | jq -r ".upload_url" | sed s/"{?name}"//)
 echo "Uploading harbor-darwin-amd64-$version.tar.gz"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-darwin-amd64-$version.tar.gz "$upload?name=harbour-darwin-amd64-$version.tar.gz&label=Mac%20AMD64"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-darwin-amd64-$version.tar.gz "$upload?name=lfs-test-server-darwin-amd64-$version.tar.gz&label=Mac%20AMD64"
 
 echo "Uploading harbor-linux-386-$version.tar.gz"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-linux-386-$version.tar.gz "$upload?name=harbour-linux-386-$version.tar.gz&label=Linux%20386"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-linux-386-$version.tar.gz "$upload?name=lfs-test-server-linux-386-$version.tar.gz&label=Linux%20386"
 
 echo "Uploading harbor-linux-amd64-$version.tar.gz"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-linux-amd64-$version.tar.gz "$upload?name=harbour-linux-amd64-$version.tar.gz&label=Linux%20AMD64"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-linux-amd64-$version.tar.gz "$upload?name=lfs-test-server-linux-amd64-$version.tar.gz&label=Linux%20AMD64"
 
 echo "Uploading harbor-freebsd-386-$version.tar.gz"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-freebsd-386-$version.tar.gz "$upload?name=harbour-freebsd-386-$version.tar.gz&label=FreeBSD%20386"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-freebsd-386-$version.tar.gz "$upload?name=lfs-test-server-freebsd-386-$version.tar.gz&label=FreeBSD%20386"
 
 echo "Uploading harbor-freebsd-amd64-$version.tar.gz"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-freebsd-amd64-$version.tar.gz "$upload?name=harbour-freebsd-amd64-$version.tar.gz&label=FreeBSD%20AMD64"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-freebsd-amd64-$version.tar.gz "$upload?name=lfs-test-server-freebsd-amd64-$version.tar.gz&label=FreeBSD%20AMD64"
 
 echo "Uploading harbor-windows-386-$version.zip"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-windows-386-$version.zip "$upload?name=harbour-windows-386-$version.zip&label=Windows%20386"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-windows-386-$version.zip "$upload?name=lfs-test-server-windows-386-$version.zip&label=Windows%20386"
 
 echo "Uploading harbor-windows-amd64-$version"
-curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/harbour-windows-amd64-$version.zip "$upload?name=harbour-windows-amd64-$version.zip&label=Windows%20AMD64"
+curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-windows-amd64-$version.zip "$upload?name=lfs-test-server-windows-amd64-$version.zip&label=Windows%20AMD64"
 
 rm -f $tmpl $out
 rm -rf dist

@@ -53,7 +53,7 @@ func (l *KVLogger) Log(data kv) {
 		line = 0
 	}
 
-	out := fmt.Sprintf("%s %s harbour[%d] [%s:%d]: ", time.Now().UTC().Format(time.RFC3339), hostname, pid, file, line)
+	out := fmt.Sprintf("%s %s lfs[%d] [%s:%d]: ", time.Now().UTC().Format(time.RFC3339), hostname, pid, file, line)
 	var vals []string
 
 	for k, v := range data {
