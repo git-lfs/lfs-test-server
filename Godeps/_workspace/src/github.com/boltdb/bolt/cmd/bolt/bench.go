@@ -46,7 +46,7 @@ func Bench(options *BenchOptions) {
 		fatal(err)
 		return
 	}
-	db.FillPercent = options.FillPercent
+	db.NoSync = options.NoSync
 	defer db.Close()
 
 	// Enable streaming stats.
@@ -139,6 +139,7 @@ func benchWriteWithSource(db *bolt.DB, options *BenchOptions, results *BenchResu
 	for i := 0; i < options.Iterations; i += options.BatchSize {
 		err := db.Update(func(tx *bolt.Tx) error {
 			b, _ := tx.CreateBucketIfNotExists(benchBucketName)
+			b.FillPercent = options.FillPercent
 
 			for j := 0; j < options.BatchSize; j++ {
 				var key = make([]byte, options.KeySize)
@@ -164,10 +165,12 @@ func benchWriteNestedWithSource(db *bolt.DB, options *BenchOptions, results *Ben
 	for i := 0; i < options.Iterations; i += options.BatchSize {
 		err := db.Update(func(tx *bolt.Tx) error {
 			top, _ := tx.CreateBucketIfNotExists(benchBucketName)
+			top.FillPercent = options.FillPercent
 
 			var name = make([]byte, options.KeySize)
 			binary.BigEndian.PutUint32(name, keySource())
 			b, _ := top.CreateBucketIfNotExists(name)
+			b.FillPercent = options.FillPercent
 
 			for j := 0; j < options.BatchSize; j++ {
 				var key = make([]byte, options.KeySize)
@@ -280,7 +283,7 @@ func benchStartProfiling(options *BenchOptions) {
 	if options.CPUProfile != "" {
 		cpuprofile, err = os.Create(options.CPUProfile)
 		if err != nil {
-			fatal("bench: could not create cpu profile %q: %v", options.CPUProfile, err)
+			fatalf("bench: could not create cpu profile %q: %v", options.CPUProfile, err)
 		}
 		pprof.StartCPUProfile(cpuprofile)
 	}
@@ -289,7 +292,7 @@ func benchStartProfiling(options *BenchOptions) {
 	if options.MemProfile != "" {
 		memprofile, err = os.Create(options.MemProfile)
 		if err != nil {
-			fatal("bench: could not create memory profile %q: %v", options.MemProfile, err)
+			fatalf("bench: could not create memory profile %q: %v", options.MemProfile, err)
 		}
 		runtime.MemProfileRate = 4096
 	}
@@ -298,7 +301,7 @@ func benchStartProfiling(options *BenchOptions) {
 	if options.BlockProfile != "" {
 		blockprofile, err = os.Create(options.BlockProfile)
 		if err != nil {
-			fatal("bench: could not create block profile %q: %v", options.BlockProfile, err)
+			fatalf("bench: could not create block profile %q: %v", options.BlockProfile, err)
 		}
 		runtime.SetBlockProfileRate(1)
 	}
@@ -363,6 +366,7 @@ type BenchOptions struct {
 	BlockProfile  string
 	StatsInterval time.Duration
 	FillPercent   float64
+	NoSync        bool
 	Clean         bool
 }
 

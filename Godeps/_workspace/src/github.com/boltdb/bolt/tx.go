@@ -52,9 +52,9 @@ func (tx *Tx) init(db *DB) {
 	}
 }
 
-// id returns the transaction id.
-func (tx *Tx) id() txid {
-	return tx.meta.txid
+// ID returns the transaction id.
+func (tx *Tx) ID() int {
+	return int(tx.meta.txid)
 }
 
 // DB returns a reference to the database that created the transaction.
@@ -141,7 +141,9 @@ func (tx *Tx) Commit() error {
 	// Rebalance nodes which have had deletions.
 	var startTime = time.Now()
 	tx.root.rebalance()
-	tx.stats.RebalanceTime += time.Since(startTime)
+	if tx.stats.Rebalance > 0 {
+		tx.stats.RebalanceTime += time.Since(startTime)
+	}
 
 	// spill data onto dirty pages.
 	startTime = time.Now()
@@ -156,7 +158,7 @@ func (tx *Tx) Commit() error {
 
 	// Free the freelist and allocate new pages for it. This will overestimate
 	// the size of the freelist but not underestimate the size (which would be bad).
-	tx.db.freelist.free(tx.id(), tx.db.page(tx.meta.freelist))
+	tx.db.freelist.free(tx.meta.txid, tx.db.page(tx.meta.freelist))
 	p, err := tx.allocate((tx.db.freelist.size() / tx.db.pageSize) + 1)
 	if err != nil {
 		tx.rollback()
@@ -212,14 +214,20 @@ func (tx *Tx) Rollback() error {
 }
 
 func (tx *Tx) rollback() {
+	if tx.db == nil {
+		return
+	}
 	if tx.writable {
-		tx.db.freelist.rollback(tx.id())
+		tx.db.freelist.rollback(tx.meta.txid)
 		tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
 	}
 	tx.close()
 }
 
 func (tx *Tx) close() {
+	if tx.db == nil {
+		return
+	}
 	if tx.writable {
 		// Grab freelist stats.
 		var freelistFreeN = tx.db.freelist.free_count()
@@ -244,37 +252,42 @@ func (tx *Tx) close() {
 }
 
 // Copy writes the entire database to a writer.
-// A reader transaction is maintained during the copy so it is safe to continue
-// using the database while a copy is in progress.
-// Copy will write exactly tx.Size() bytes into the writer.
+// This function exists for backwards compatibility. Use WriteTo() in
 func (tx *Tx) Copy(w io.Writer) error {
-	var f *os.File
-	var err error
+	_, err := tx.WriteTo(w)
+	return err
+}
 
+// WriteTo writes the entire database to a writer.
+// If err == nil then exactly tx.Size() bytes will be written into the writer.
+func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	// Attempt to open reader directly.
+	var f *os.File
 	if f, err = os.OpenFile(tx.db.path, os.O_RDONLY|odirect, 0); err != nil {
 		// Fallback to a regular open if that doesn't work.
 		if f, err = os.OpenFile(tx.db.path, os.O_RDONLY, 0); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
 	// Copy the meta pages.
 	tx.db.metalock.Lock()
-	_, err = io.CopyN(w, f, int64(tx.db.pageSize*2))
+	n, err = io.CopyN(w, f, int64(tx.db.pageSize*2))
 	tx.db.metalock.Unlock()
 	if err != nil {
 		_ = f.Close()
-		return fmt.Errorf("meta copy: %s", err)
+		return n, fmt.Errorf("meta copy: %s", err)
 	}
 
 	// Copy data pages.
-	if _, err := io.CopyN(w, f, tx.Size()-int64(tx.db.pageSize*2)); err != nil {
+	wn, err := io.CopyN(w, f, tx.Size()-int64(tx.db.pageSize*2))
+	n += wn
+	if err != nil {
 		_ = f.Close()
-		return err
+		return n, err
 	}
 
-	return f.Close()
+	return n, f.Close()
 }
 
 // CopyFile copies the entire database to file at the given path.
@@ -417,8 +430,10 @@ func (tx *Tx) write() error {
 		// Update statistics.
 		tx.stats.Write++
 	}
-	if err := fdatasync(tx.db.file); err != nil {
-		return err
+	if !tx.db.NoSync || IgnoreNoSync {
+		if err := fdatasync(tx.db); err != nil {
+			return err
+		}
 	}
 
 	// Clear out page cache.
@@ -438,8 +453,10 @@ func (tx *Tx) writeMeta() error {
 	if _, err := tx.db.ops.writeAt(buf, int64(p.id)*int64(tx.db.pageSize)); err != nil {
 		return err
 	}
-	if err := fdatasync(tx.db.file); err != nil {
-		return err
+	if !tx.db.NoSync || IgnoreNoSync {
+		if err := fdatasync(tx.db); err != nil {
+			return err
+		}
 	}
 
 	// Update statistics.
@@ -496,7 +513,7 @@ func (tx *Tx) Page(id int) (*PageInfo, error) {
 	}
 
 	// Determine the type (or if it's free).
-	if tx.db.freelist.isFree(pgid(id)) {
+	if tx.db.freelist.freed(pgid(id)) {
 		info.Type = "free"
 	} else {
 		info.Type = p.typ()

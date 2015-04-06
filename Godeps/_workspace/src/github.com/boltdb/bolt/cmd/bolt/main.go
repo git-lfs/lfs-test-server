@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -10,13 +9,11 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/codegangsta/cli"
-	// "github.com/davecheney/profile"
 )
 
 var branch, commit string
 
 func main() {
-	// defer profile.Start(&profile.Config{CPUProfile: true, MemProfile: true}).Stop()
 	log.SetFlags(0)
 	NewApp().Run(os.Args)
 }
@@ -61,24 +58,6 @@ func NewApp() *cli.App {
 			},
 		},
 		{
-			Name:  "import",
-			Usage: "Imports from a JSON dump into a database",
-			Flags: []cli.Flag{
-				&cli.StringFlag{Name: "input"},
-			},
-			Action: func(c *cli.Context) {
-				Import(c.Args().Get(0), c.String("input"))
-			},
-		},
-		{
-			Name:  "export",
-			Usage: "Exports a database to JSON",
-			Action: func(c *cli.Context) {
-				path := c.Args().Get(0)
-				Export(path)
-			},
-		},
-		{
 			Name:  "pages",
 			Usage: "Dumps page information for a database",
 			Action: func(c *cli.Context) {
@@ -118,6 +97,7 @@ func NewApp() *cli.App {
 				&cli.StringFlag{Name: "blockprofile", Usage: "Block profile output path"},
 				&cli.StringFlag{Name: "stats-interval", Value: "0s", Usage: "Continuous stats interval"},
 				&cli.Float64Flag{Name: "fill-percent", Value: bolt.DefaultFillPercent, Usage: "Fill percentage"},
+				&cli.BoolFlag{Name: "no-sync", Usage: "Skip fsync on every commit"},
 				&cli.BoolFlag{Name: "work", Usage: "Print the temp db and do not delete on exit"},
 			},
 			Action: func(c *cli.Context) {
@@ -139,6 +119,7 @@ func NewApp() *cli.App {
 					BlockProfile:  c.String("blockprofile"),
 					StatsInterval: statsInterval,
 					FillPercent:   c.Float64("fill-percent"),
+					NoSync:        c.Bool("no-sync"),
 					Clean:         !c.Bool("work"),
 				})
 			},
@@ -214,11 +195,4 @@ func SetTestMode(value bool) {
 	} else {
 		logger = log.New(os.Stderr, "", 0)
 	}
-}
-
-// rawMessage represents a JSON element in the import/export document.
-type rawMessage struct {
-	Type  string          `json:"type,omitempty"`
-	Key   []byte          `json:"key"`
-	Value json.RawMessage `json:"value"`
 }

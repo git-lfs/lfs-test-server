@@ -23,6 +23,15 @@ const (
 
 const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
 
+const (
+	minFillPercent = 0.1
+	maxFillPercent = 1.0
+)
+
+// DefaultFillPercent is the percentage that split pages are filled.
+// This value can be changed by setting Bucket.FillPercent.
+const DefaultFillPercent = 0.5
+
 // Bucket represents a collection of key/value pairs inside the database.
 type Bucket struct {
 	*bucket
@@ -31,6 +40,13 @@ type Bucket struct {
 	page     *page              // inline page reference
 	rootNode *node              // materialized node for the root page.
 	nodes    map[pgid]*node     // node cache
+
+	// Sets the threshold for filling nodes when they split. By default,
+	// the bucket will fill to 50% but it can be useful to increase this
+	// amount if you know that your write workloads are mostly append-only.
+	//
+	// This is non-persisted across transactions so it must be set in every Tx.
+	FillPercent float64
 }
 
 // bucket represents the on-file representation of a bucket.
@@ -44,7 +60,7 @@ type bucket struct {
 
 // newBucket returns a new bucket associated with a transaction.
 func newBucket(tx *Tx) Bucket {
-	var b = Bucket{tx: tx}
+	var b = Bucket{tx: tx, FillPercent: DefaultFillPercent}
 	if tx.writable {
 		b.buckets = make(map[string]*Bucket)
 		b.nodes = make(map[pgid]*node)
@@ -155,7 +171,11 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	}
 
 	// Create empty, inline bucket.
-	var bucket = Bucket{bucket: &bucket{}, rootNode: &node{isLeaf: true}}
+	var bucket = Bucket{
+		bucket:      &bucket{},
+		rootNode:    &node{isLeaf: true},
+		FillPercent: DefaultFillPercent,
+	}
 	var value = bucket.write()
 
 	// Insert into node.
@@ -232,6 +252,7 @@ func (b *Bucket) DeleteBucket(key []byte) error {
 
 // Get retrieves the value for a key in the bucket.
 // Returns a nil value if the key does not exist or if the key is a nested bucket.
+// The returned value is only valid for the life of the transaction.
 func (b *Bucket) Get(key []byte) []byte {
 	k, v, flags := b.Cursor().seek(key)
 
@@ -310,6 +331,12 @@ func (b *Bucket) NextSequence() (uint64, error) {
 		return 0, ErrTxClosed
 	} else if !b.Writable() {
 		return 0, ErrTxNotWritable
+	}
+
+	// Materialize the root node if it hasn't been already so that the
+	// bucket will be saved during commit.
+	if b.rootNode == nil {
+		_ = b.node(b.root, nil)
 	}
 
 	// Increment and return the sequence.
@@ -491,8 +518,12 @@ func (b *Bucket) spill() error {
 		// Update parent node.
 		var c = b.Cursor()
 		k, _, flags := c.seek([]byte(name))
-		_assert(bytes.Equal([]byte(name), k), "misplaced bucket header: %x -> %x", []byte(name), k)
-		_assert(flags&bucketLeafFlag != 0, "unexpected bucket header flag: %x", flags)
+		if !bytes.Equal([]byte(name), k) {
+			panic(fmt.Sprintf("misplaced bucket header: %x -> %x", []byte(name), k))
+		}
+		if flags&bucketLeafFlag == 0 {
+			panic(fmt.Sprintf("unexpected bucket header flag: %x", flags))
+		}
 		c.node().put([]byte(name), []byte(name), value, 0, bucketLeafFlag)
 	}
 
@@ -508,7 +539,9 @@ func (b *Bucket) spill() error {
 	b.rootNode = b.rootNode.root()
 
 	// Update the root node for this bucket.
-	_assert(b.rootNode.pgid < b.tx.meta.pgid, "pgid (%d) above high water mark (%d)", b.rootNode.pgid, b.tx.meta.pgid)
+	if b.rootNode.pgid >= b.tx.meta.pgid {
+		panic(fmt.Sprintf("pgid (%d) above high water mark (%d)", b.rootNode.pgid, b.tx.meta.pgid))
+	}
 	b.root = b.rootNode.pgid
 
 	return nil
@@ -614,7 +647,7 @@ func (b *Bucket) free() {
 	var tx = b.tx
 	b.forEachPageNode(func(p *page, n *node, _ int) {
 		if p != nil {
-			tx.db.freelist.free(tx.id(), p)
+			tx.db.freelist.free(tx.meta.txid, p)
 		} else {
 			n.free()
 		}
@@ -625,7 +658,7 @@ func (b *Bucket) free() {
 // dereference removes all references to the old mmap.
 func (b *Bucket) dereference() {
 	if b.rootNode != nil {
-		b.rootNode.dereference()
+		b.rootNode.root().dereference()
 	}
 
 	for _, child := range b.buckets {
@@ -639,7 +672,9 @@ func (b *Bucket) pageNode(id pgid) (*page, *node) {
 	// Inline buckets have a fake page embedded in their value so treat them
 	// differently. We'll return the rootNode (if available) or the fake page.
 	if b.root == 0 {
-		_assert(id == 0, "inline bucket non-zero page access(2): %d != 0", id)
+		if id != 0 {
+			panic(fmt.Sprintf("inline bucket non-zero page access(2): %d != 0", id))
+		}
 		if b.rootNode != nil {
 			return nil, b.rootNode
 		}

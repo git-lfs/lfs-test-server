@@ -4,8 +4,8 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/boltdb/bolt",
-			"Comment": "data/v1-189-gd9a0f51",
-			"Rev": "d9a0f51bee413ccff75251740d7d78736a9c4a49"
+			"Comment": "v1.0-62-gee95430",
+			"Rev": "ee954308d64186f0fc9b7022b6178977848c17a3"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
