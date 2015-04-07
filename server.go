@@ -25,7 +25,7 @@ type RequestVars struct {
 }
 
 // Meta is object metadata as seen by the object and metadata stores.
-type Meta struct {
+type MetaObject struct {
 	Oid      string `json:"oid"`
 	Size     int64  `json:"size"`
 	Existing bool
@@ -188,7 +188,7 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 
 // Represent takes a RequestVars and Meta and turns it into a Representation suitable
 // for json encoding
-func (a *App) Represent(rv *RequestVars, meta *Meta, download, upload bool) *Representation {
+func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool) *Representation {
 	rep := &Representation{
 		Oid:   meta.Oid,
 		Size:  meta.Size,

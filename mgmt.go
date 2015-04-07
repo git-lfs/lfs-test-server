@@ -17,13 +17,15 @@ var (
 )
 
 type pageData struct {
-	Name   string
-	Config *Configuration
-	Users  []*MetaUser
+	Name    string
+	Config  *Configuration
+	Users   []*MetaUser
+	Objects []*MetaObject
 }
 
 func (a *App) addMgmt(r *mux.Router) {
 	r.HandleFunc("/mgmt", basicAuth(a.indexHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/objects", basicAuth(a.objectsHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/users", basicAuth(a.usersHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/add", basicAuth(a.addUserHandler)).Methods("POST")
 	r.HandleFunc("/mgmt/del", basicAuth(a.delUserHandler)).Methods("POST")
@@ -95,6 +97,33 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.New("content").Parse(configString)
 
 	t.Execute(w, pageData{Name: "index", Config: Config})
+}
+
+func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
+	bodyString, err := templateBox.String("body.tmpl")
+	if err != nil {
+		http.Error(w, "Not Found", 404)
+		logRequest(r, 404)
+		return
+	}
+
+	contentString, err := templateBox.String("objects.tmpl")
+	if err != nil {
+		http.Error(w, "Not Found", 404)
+		logRequest(r, 404)
+		return
+	}
+
+	t := template.Must(template.New("main").Parse(bodyString))
+	t.New("content").Parse(contentString)
+
+	objects, err := a.metaStore.Objects()
+	if err != nil {
+		fmt.Fprintf(w, "Error retrieving objects: %s", err)
+		return
+	}
+
+	t.Execute(w, pageData{Name: "objects", Objects: objects})
 }
 
 func (a *App) usersHandler(w http.ResponseWriter, r *http.Request) {
