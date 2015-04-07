@@ -32,15 +32,14 @@ func (a *App) addMgmt(r *mux.Router) {
 
 	cssBox = rice.MustFindBox("mgmt/css")
 	templateBox = rice.MustFindBox("mgmt/templates")
-	r.HandleFunc("/mgmt/css/{file}", cssHandler)
+	r.HandleFunc("/mgmt/css/{file}", basicAuth(cssHandler))
 }
 
 func cssHandler(w http.ResponseWriter, r *http.Request) {
 	file := mux.Vars(r)["file"]
 	f, err := cssBox.Open(file)
 	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
+		writeStatus(w, r, 404)
 		return
 	}
 
@@ -53,23 +52,20 @@ func cssHandler(w http.ResponseWriter, r *http.Request) {
 func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if Config.AdminUser == "" || Config.AdminPass == "" {
-			http.Error(w, "Not Found", 404)
-			logRequest(r, 404)
+			writeStatus(w, r, 404)
 			return
 		}
 
 		user, pass, ok := r.BasicAuth()
 		if !ok {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			http.Error(w, "authorization failed", 401)
-			logRequest(r, 401)
+			writeStatus(w, r, 401)
 			return
 		}
 
 		if user != Config.AdminUser || pass != Config.AdminPass {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			http.Error(w, "authorization failed", 401)
-			logRequest(r, 401)
+			writeStatus(w, r, 401)
 			return
 		}
 
@@ -79,78 +75,33 @@ func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 }
 
 func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
-	bodyString, err := templateBox.String("body.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
+	if err := render(w, "config.tmpl", pageData{Name: "index", Config: Config}); err != nil {
+		writeStatus(w, r, 404)
 	}
-
-	configString, err := templateBox.String("config.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
-	}
-
-	t := template.Must(template.New("main").Parse(bodyString))
-	t.New("content").Parse(configString)
-
-	t.Execute(w, pageData{Name: "index", Config: Config})
 }
 
 func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
-	bodyString, err := templateBox.String("body.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
-	}
-
-	contentString, err := templateBox.String("objects.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
-	}
-
-	t := template.Must(template.New("main").Parse(bodyString))
-	t.New("content").Parse(contentString)
-
 	objects, err := a.metaStore.Objects()
 	if err != nil {
 		fmt.Fprintf(w, "Error retrieving objects: %s", err)
 		return
 	}
 
-	t.Execute(w, pageData{Name: "objects", Objects: objects})
+	if err := render(w, "objects.tmpl", pageData{Name: "objects", Objects: objects}); err != nil {
+		writeStatus(w, r, 404)
+	}
 }
 
 func (a *App) usersHandler(w http.ResponseWriter, r *http.Request) {
-	bodyString, err := templateBox.String("body.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
-	}
-
-	contentString, err := templateBox.String("users.tmpl")
-	if err != nil {
-		http.Error(w, "Not Found", 404)
-		logRequest(r, 404)
-		return
-	}
-
-	t := template.Must(template.New("main").Parse(bodyString))
-	t.New("content").Parse(contentString)
-
 	users, err := a.metaStore.Users()
 	if err != nil {
 		fmt.Fprintf(w, "Error retrieving users: %s", err)
 		return
 	}
 
-	t.Execute(w, pageData{Name: "users", Users: users})
+	if err := render(w, "users.tmpl", pageData{Name: "users", Users: users}); err != nil {
+		writeStatus(w, r, 404)
+	}
 }
 
 func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +135,23 @@ func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/mgmt/users", 302)
 }
 
+func render(w http.ResponseWriter, tmpl string, data pageData) error {
+	bodyString, err := templateBox.String("body.tmpl")
+	if err != nil {
+		return err
+	}
+
+	contentString, err := templateBox.String(tmpl)
+	if err != nil {
+		return err
+	}
+
+	t := template.Must(template.New("main").Parse(bodyString))
+	t.New("content").Parse(contentString)
+
+	return t.Execute(w, data)
+}
+
 func authenticate(r *http.Request) error {
 	err := errors.New("Forbidden")
 
@@ -201,17 +169,3 @@ func authenticate(r *http.Request) error {
 	}
 	return err
 }
-
-var indexTemplate = `
-<h2>Users</h2>
-{{range .Users}}
-<div>{{.Name}} <form method="POST" action="/mgmt/del"><input type="hidden" name="name" value="{{.Name}}"/><input type="submit" value="Delete"/></form></div>
-{{end}}
-
-<form method="POST" action="/mgmt/add">
-<label id="name">Name:</label>
-<input type="text" name="name" />
-<input type="password" name="password" />
-<input type="submit" value="Add User" />
-</form>
-`

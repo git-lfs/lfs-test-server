@@ -24,7 +24,7 @@ type RequestVars struct {
 	Authorization string
 }
 
-// Meta is object metadata as seen by the object and metadata stores.
+// MetaObject is object metadata as seen by the object and metadata stores.
 type MetaObject struct {
 	Oid      string `json:"oid"`
 	Size     int64  `json:"size"`
