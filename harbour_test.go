@@ -240,7 +240,7 @@ func TestPut(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 
-	r, err := testContentStore.Get(&Meta{Oid: contentOid})
+	r, err := testContentStore.Get(&MetaObject{Oid: contentOid})
 	if err != nil {
 		t.Fatalf("error retreiving from content store: %s", err)
 	}
@@ -361,7 +361,7 @@ func seedMetaStore() error {
 }
 
 func seedContentStore() error {
-	meta := &Meta{Oid: contentOid, Size: contentSize}
+	meta := &MetaObject{Oid: contentOid, Size: contentSize}
 	buf := bytes.NewBuffer([]byte(content))
 	if err := testContentStore.Put(meta, buf); err != nil {
 		return err

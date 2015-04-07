@@ -23,6 +23,12 @@ would like to make that are not dependent upon each other, consider submitting
 them as separate pull requests.
 - Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 
+## Updating management templates
+0. Install go.rice with `go install github.com/GeertJohan/go.rice`
+0. Run `rice embed-go` after all template changes have been made
+0. Commit the change
+0. Submit a pull request.
+
 ## Updating 3rd party packages
 
 0. Run `godep save` to add new dependencies.

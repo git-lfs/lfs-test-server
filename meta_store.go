@@ -51,12 +51,12 @@ func NewMetaStore(dbFile string) (*MetaStore, error) {
 
 // Get retrieves the Meta information for an object given information in
 // RequestVars
-func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
+func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
 	if !s.authenticate(v.Authorization) {
 		return nil, newAuthError()
 	}
 
-	var meta Meta
+	var meta MetaObject
 	var value []byte
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -87,7 +87,7 @@ func (s *MetaStore) Get(v *RequestVars) (*Meta, error) {
 }
 
 // Put writes meta information from RequestVars to the store.
-func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
+func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
 	if !s.authenticate(v.Authorization) {
 		return nil, newAuthError()
 	}
@@ -100,7 +100,7 @@ func (s *MetaStore) Put(v *RequestVars) (*Meta, error) {
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	meta := Meta{Oid: v.Oid, Size: v.Size}
+	meta := MetaObject{Oid: v.Oid, Size: v.Size}
 	err := enc.Encode(meta)
 	if err != nil {
 		return nil, err
@@ -188,6 +188,32 @@ func (s *MetaStore) Users() ([]*MetaUser, error) {
 	})
 
 	return users, err
+}
+
+// Objects returns all MetaObjects in the meta store
+func (s *MetaStore) Objects() ([]*MetaObject, error) {
+	var objects []*MetaObject
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(objectsBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		bucket.ForEach(func(k, v []byte) error {
+			var meta MetaObject
+			dec := gob.NewDecoder(bytes.NewBuffer(v))
+			err := dec.Decode(&meta)
+			if err != nil {
+				return err
+			}
+			objects = append(objects, &meta)
+			return nil
+		})
+		return nil
+	})
+
+	return objects, err
 }
 
 // authenticate uses the authorization string to determine whether

@@ -14,7 +14,7 @@ func TestContenStorePut(t *testing.T) {
 	setup()
 	defer teardown()
 
-	m := &Meta{
+	m := &MetaObject{
 		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
 		Size: 12,
 	}
@@ -35,7 +35,7 @@ func TestContenStorePutHashMismatch(t *testing.T) {
 	setup()
 	defer teardown()
 
-	m := &Meta{
+	m := &MetaObject{
 		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
 		Size: 12,
 	}
@@ -56,7 +56,7 @@ func TestContenStorePutSizeMismatch(t *testing.T) {
 	setup()
 	defer teardown()
 
-	m := &Meta{
+	m := &MetaObject{
 		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
 		Size: 14,
 	}
@@ -77,7 +77,7 @@ func TestContenStoreGet(t *testing.T) {
 	setup()
 	defer teardown()
 
-	m := &Meta{
+	m := &MetaObject{
 		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
 		Size: 12,
 	}
@@ -103,7 +103,7 @@ func TestContenStoreGetNonExisting(t *testing.T) {
 	setup()
 	defer teardown()
 
-	_, err := contentStore.Get(&Meta{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+	_, err := contentStore.Get(&MetaObject{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
 	if err == nil {
 		t.Fatalf("expected to get an error, but content existed")
 	}
@@ -113,7 +113,7 @@ func TestContenStoreExists(t *testing.T) {
 	setup()
 	defer teardown()
 
-	m := &Meta{
+	m := &MetaObject{
 		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
 		Size: 12,
 	}

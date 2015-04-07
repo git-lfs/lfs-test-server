@@ -4,37 +4,68 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 
+	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
 )
 
+var (
+	cssBox      *rice.Box
+	templateBox *rice.Box
+)
+
+type pageData struct {
+	Name    string
+	Config  *Configuration
+	Users   []*MetaUser
+	Objects []*MetaObject
+}
+
 func (a *App) addMgmt(r *mux.Router) {
 	r.HandleFunc("/mgmt", basicAuth(a.indexHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/objects", basicAuth(a.objectsHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/users", basicAuth(a.usersHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/add", basicAuth(a.addUserHandler)).Methods("POST")
 	r.HandleFunc("/mgmt/del", basicAuth(a.delUserHandler)).Methods("POST")
+
+	cssBox = rice.MustFindBox("mgmt/css")
+	templateBox = rice.MustFindBox("mgmt/templates")
+	r.HandleFunc("/mgmt/css/{file}", basicAuth(cssHandler))
+}
+
+func cssHandler(w http.ResponseWriter, r *http.Request) {
+	file := mux.Vars(r)["file"]
+	f, err := cssBox.Open(file)
+	if err != nil {
+		writeStatus(w, r, 404)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/css")
+
+	io.Copy(w, f)
+	f.Close()
 }
 
 func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if Config.AdminUser == "" || Config.AdminPass == "" {
-			http.Error(w, "Not Found", 404)
-			logRequest(r, 404)
+			writeStatus(w, r, 404)
 			return
 		}
 
 		user, pass, ok := r.BasicAuth()
 		if !ok {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			http.Error(w, "authorization failed", 401)
-			logRequest(r, 401)
+			writeStatus(w, r, 401)
 			return
 		}
 
 		if user != Config.AdminUser || pass != Config.AdminPass {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			http.Error(w, "authorization failed", 401)
-			logRequest(r, 401)
+			writeStatus(w, r, 401)
 			return
 		}
 
@@ -44,22 +75,33 @@ func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 }
 
 func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
-	t := template.Must(template.New("main").Parse(bodyTemplate))
-	t.New("body").Parse(indexTemplate)
+	if err := render(w, "config.tmpl", pageData{Name: "index", Config: Config}); err != nil {
+		writeStatus(w, r, 404)
+	}
+}
 
-	type lfs struct {
-		Users []*MetaUser
+func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
+	objects, err := a.metaStore.Objects()
+	if err != nil {
+		fmt.Fprintf(w, "Error retrieving objects: %s", err)
+		return
 	}
 
+	if err := render(w, "objects.tmpl", pageData{Name: "objects", Objects: objects}); err != nil {
+		writeStatus(w, r, 404)
+	}
+}
+
+func (a *App) usersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := a.metaStore.Users()
 	if err != nil {
 		fmt.Fprintf(w, "Error retrieving users: %s", err)
 		return
 	}
 
-	l := &lfs{Users: users}
-
-	t.Execute(w, l)
+	if err := render(w, "users.tmpl", pageData{Name: "users", Users: users}); err != nil {
+		writeStatus(w, r, 404)
+	}
 }
 
 func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +117,7 @@ func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/mgmt", 302)
+	http.Redirect(w, r, "/mgmt/users", 302)
 }
 
 func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +132,24 @@ func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/mgmt", 302)
+	http.Redirect(w, r, "/mgmt/users", 302)
+}
+
+func render(w http.ResponseWriter, tmpl string, data pageData) error {
+	bodyString, err := templateBox.String("body.tmpl")
+	if err != nil {
+		return err
+	}
+
+	contentString, err := templateBox.String(tmpl)
+	if err != nil {
+		return err
+	}
+
+	t := template.Must(template.New("main").Parse(bodyString))
+	t.New("content").Parse(contentString)
+
+	return t.Execute(w, data)
 }
 
 func authenticate(r *http.Request) error {
@@ -110,27 +169,3 @@ func authenticate(r *http.Request) error {
 	}
 	return err
 }
-
-var bodyTemplate = `<html>
-<head>
-	<title>Git LFS Server Management</title>
-</head>
-<body>
-{{template "body" .}}
-</body>
-</html>
-`
-
-var indexTemplate = `
-<h2>Users</h2>
-{{range .Users}}
-<div>{{.Name}} <form method="POST" action="/mgmt/del"><input type="hidden" name="name" value="{{.Name}}"/><input type="submit" value="Delete"/></form></div>
-{{end}}
-
-<form method="POST" action="/mgmt/add">
-<label id="name">Name:</label>
-<input type="text" name="name" />
-<input type="password" name="password" />
-<input type="submit" value="Add User" />
-</form>
-`
