@@ -13,7 +13,6 @@ import (
 type Configuration struct {
 	Listen      string `config:"tcp://:8080"`
 	Host        string `config:"localhost:8080"`
-	Scheme      string `config:"https"`
 	MetaDB      string `config:"lfs.db"`
 	ContentPath string `config:"lfs-content"`
 	AdminUser   string `config:""`
