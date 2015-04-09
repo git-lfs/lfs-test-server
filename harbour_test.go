@@ -305,8 +305,6 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	Config.Scheme = "http"
-
 	os.Remove("lfs-test.db")
 
 	var err error
