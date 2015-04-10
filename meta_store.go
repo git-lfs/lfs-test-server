@@ -57,7 +57,6 @@ func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
 	}
 
 	var meta MetaObject
-	var value []byte
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(objectsBucket)
@@ -65,25 +64,20 @@ func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
 			return errNoBucket
 		}
 
-		value = bucket.Get([]byte(v.Oid))
-		return nil
+		value := bucket.Get([]byte(v.Oid))
+		if len(value) == 0 {
+			return errObjectNotFound
+		}
+
+		dec := gob.NewDecoder(bytes.NewBuffer(value))
+		return dec.Decode(&meta)
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(value) == 0 {
-		return nil, errObjectNotFound
-	}
-
-	dec := gob.NewDecoder(bytes.NewBuffer(value))
-	err = dec.Decode(&meta)
-	if err != nil {
-		return nil, err
-	}
-
-	return &meta, err
+	return &meta, nil
 }
 
 // Put writes meta information from RequestVars to the store.
