@@ -49,7 +49,7 @@ There are few things that can be configured via environment variables:
 
 If the `LFS_ADMINUSER` and `LFS_ADMINPASS` variables are set, a
 rudimentary admin interface can be accessed via
-`$LFS_SCHEME://$LFS_HOST/mgmt`. Here you can add and remove users.
+`http://$LFS_HOST/mgmt`. Here you can add and remove users.
 
 To use the LFS test server with the Git LFS client, configure it in the repository's `.gitconfig` file:
 
