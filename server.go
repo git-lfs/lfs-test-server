@@ -41,6 +41,11 @@ type Representation struct {
 // ObjectLink builds a URL linking to the object.
 func (v *RequestVars) ObjectLink() string {
 	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, v.Oid)
+
+	if Config.IsHTTPS() {
+		return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
+	}
+
 	return fmt.Sprintf("http://%s%s", Config.Host, path)
 }
 

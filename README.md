@@ -46,6 +46,9 @@ There are few things that can be configured via environment variables:
 	LFS_CONTENTPATH # The path where LFS files are store, default: "lfs-content"
 	LFS_ADMINUSER   # An administrator username, default: unset
 	LFS_ADMINPASS   # An administrator password, default: unset
+	LFS_CERT        # Certificate file for tls
+	LFS_KEY         # tls key
+	LFS_SCHEME      # set to 'https' to override default http
 
 If the `LFS_ADMINUSER` and `LFS_ADMINPASS` variables are set, a
 rudimentary admin interface can be accessed via
@@ -53,7 +56,75 @@ rudimentary admin interface can be accessed via
 
 To use the LFS test server with the Git LFS client, configure it in the repository's `.gitconfig` file:
 
+
 ```
   [lfs]
     url = "http://localhost:8080/janedoe/lfsrepo"
+
 ```
+
+HTTPS:
+
+NOTE: If using https with a self signed cert also disable cert checking in the client repo.
+
+```
+	[lfs]
+		url = "https://localhost:8080/jimdoe/lfsrepo"
+
+	[http]
+		selfverify = false
+
+```
+
+
+An example usage:
+
+
+Generate a key pair
+```
+openssl req -x509 -sha256 -nodes -days 2100 -newkey rsa:2048 -keyout mine.key -out mine.crt
+```
+
+Make yourself a run script
+
+```
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+
+LFS_LISTEN="tcp://:9999"
+LFS_HOST="127.0.0.1:9999"
+LFS_CONTENTPATH="content"
+LFS_ADMINUSER="<cool admin user name>"
+LFS_ADMINPASS="<better admin password>"
+LFS_CERT="mine.crt"
+LFS_KEY="mine.key"
+LFS_SCHEME="https"
+
+export LFS_LISTEN LFS_HOST LFS_CONTENTPATH LFS_ADMINUSER LFS_ADMINPASS LFS_CERT LFS_KEY LFS_SCHEME
+
+./lfs-test-server
+
+```
+
+Build the server
+
+```
+go build
+
+```
+
+Run
+
+```
+bash run.sh
+
+```
+
+Check the managment page
+
+browser: https://localhost:9999/mgmt
+
+

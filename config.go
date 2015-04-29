@@ -17,6 +17,13 @@ type Configuration struct {
 	ContentPath string `config:"lfs-content"`
 	AdminUser   string `config:""`
 	AdminPass   string `config:""`
+	Cert        string `config:""`
+	Key         string `config:""`
+	Scheme      string `config:""`
+}
+
+func (c *Configuration) IsHTTPS() bool {
+	return strings.Contains(Config.Scheme, "https")
 }
 
 // Config is the global app configuration
