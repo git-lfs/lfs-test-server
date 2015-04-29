@@ -108,25 +108,25 @@ echo "Created release id: $id"
 
 # Upload each file to the release
 upload=$(cat $out | jq -r ".upload_url" | sed s/"{?name}"//)
-echo "Uploading harbor-darwin-amd64-$version.tar.gz"
+echo "Uploading lfs-test-server-darwin-amd64-$version.tar.gz"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-darwin-amd64-$version.tar.gz "$upload?name=lfs-test-server-darwin-amd64-$version.tar.gz&label=Mac%20AMD64"
 
-echo "Uploading harbor-linux-386-$version.tar.gz"
+echo "Uploading lfs-test-server-linux-386-$version.tar.gz"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-linux-386-$version.tar.gz "$upload?name=lfs-test-server-linux-386-$version.tar.gz&label=Linux%20386"
 
-echo "Uploading harbor-linux-amd64-$version.tar.gz"
+echo "Uploading lfs-test-server-linux-amd64-$version.tar.gz"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-linux-amd64-$version.tar.gz "$upload?name=lfs-test-server-linux-amd64-$version.tar.gz&label=Linux%20AMD64"
 
-echo "Uploading harbor-freebsd-386-$version.tar.gz"
+echo "Uploading lfs-test-server-freebsd-386-$version.tar.gz"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-freebsd-386-$version.tar.gz "$upload?name=lfs-test-server-freebsd-386-$version.tar.gz&label=FreeBSD%20386"
 
-echo "Uploading harbor-freebsd-amd64-$version.tar.gz"
+echo "Uploading lfs-test-server-freebsd-amd64-$version.tar.gz"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-freebsd-amd64-$version.tar.gz "$upload?name=lfs-test-server-freebsd-amd64-$version.tar.gz&label=FreeBSD%20AMD64"
 
-echo "Uploading harbor-windows-386-$version.zip"
+echo "Uploading lfs-test-server-windows-386-$version.zip"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-windows-386-$version.zip "$upload?name=lfs-test-server-windows-386-$version.zip&label=Windows%20386"
 
-echo "Uploading harbor-windows-amd64-$version"
+echo "Uploading lfs-test-server-windows-amd64-$version"
 curl -n -o $out -H "Content-Type: application/octet-stream" -X POST --data-binary @dist/lfs-test-server-windows-amd64-$version.zip "$upload?name=lfs-test-server-windows-amd64-$version.zip&label=Windows%20AMD64"
 
 rm -f $tmpl $out
