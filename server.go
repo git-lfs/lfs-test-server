@@ -24,6 +24,10 @@ type RequestVars struct {
 	Authorization string
 }
 
+type BatchVars struct {
+	Objects []*RequestVars `json:"objects"`
+}
+
 // MetaObject is object metadata as seen by the object and metadata stores.
 type MetaObject struct {
 	Oid      string `json:"oid"`
@@ -68,6 +72,7 @@ func NewApp(content *ContentStore, meta *MetaStore) *App {
 
 	r := mux.NewRouter()
 
+	r.HandleFunc("/{user}/{repo}/objects/batch", app.BatchHandler).Methods("POST").MatcherFunc(MetaMatcher)
 	route := "/{user}/{repo}/objects/{oid}"
 	r.HandleFunc(route, app.GetContentHandler).Methods("GET", "HEAD").MatcherFunc(ContentMatcher)
 	r.HandleFunc(route, app.GetMetaHandler).Methods("GET", "HEAD").MatcherFunc(MetaMatcher)
@@ -169,6 +174,39 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, sentStatus)
 }
 
+// BatchHandler provides the batch api
+func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
+	bv := unpackbatch(r)
+
+	var responseObjects []*Representation
+
+	// Create a response object
+	for _, object := range bv.Objects {
+		meta, err := a.metaStore.Get(object)
+		if err == nil { // Object is found
+			responseObjects = append(responseObjects, a.Represent(object, meta, true, false))
+			continue
+		}
+
+		if isAuthError(err) {
+			requireAuth(w, r)
+			return
+		}
+
+		// Object is not found
+		meta, err = a.metaStore.Put(object)
+		if err == nil {
+			responseObjects = append(responseObjects, a.Represent(object, meta, meta.Existing, true))
+		}
+	}
+
+	w.Header().Set("Content-Type", metaMediaType)
+
+	enc := json.NewEncoder(w)
+	enc.Encode(responseObjects)
+	logRequest(r, 200)
+}
+
 // PutHandler receives data from the client and puts it into the content store
 func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	rv := unpack(r)
@@ -251,6 +289,27 @@ func unpack(r *http.Request) *RequestVars {
 	}
 
 	return rv
+}
+
+// TODO cheap hack, unify with unpack
+func unpackbatch(r *http.Request) *BatchVars {
+	vars := mux.Vars(r)
+
+	var bv BatchVars
+
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&bv)
+	if err != nil {
+		return &bv
+	}
+
+	for i := 0; i < len(bv.Objects); i++ {
+		bv.Objects[i].User = vars["user"]
+		bv.Objects[i].Repo = vars["repo"]
+		bv.Objects[i].Authorization = r.Header.Get("Authorization")
+	}
+
+	return &bv
 }
 
 func writeStatus(w http.ResponseWriter, r *http.Request, status int) {
