@@ -19,7 +19,7 @@ type Configuration struct {
 	AdminPass   string `config:""`
 	Cert        string `config:""`
 	Key         string `config:""`
-	Scheme      string `config:""`
+	Scheme      string `config:"http"`
 }
 
 func (c *Configuration) IsHTTPS() bool {
