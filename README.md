@@ -72,7 +72,7 @@ NOTE: If using https with a self signed cert also disable cert checking in the c
 		url = "https://localhost:8080/jimdoe/lfsrepo"
 
 	[http]
-		selfverify = false
+		sslfverify = false
 
 ```
 
