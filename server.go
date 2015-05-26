@@ -202,8 +202,14 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
+	type ro struct {
+		Objects []*Representation `json:"objects"`
+	}
+
+	respobj := &ro{responseObjects}
+
 	enc := json.NewEncoder(w)
-	enc.Encode(responseObjects)
+	enc.Encode(respobj)
 	logRequest(r, 200)
 }
 
