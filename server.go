@@ -244,14 +244,14 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool
 		Links: make(map[string]*link),
 	}
 
+	header := make(map[string]string)
+	header["Accept"] = contentMediaType
+	header["Authorization"] = rv.Authorization
 	if download {
-		rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: map[string]string{"Accept": contentMediaType}}
+		rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
 
 	if upload {
-		header := make(map[string]string)
-		header["Accept"] = contentMediaType
-		header["Authorization"] = rv.Authorization
 		rep.Links["upload"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
 	return rep
