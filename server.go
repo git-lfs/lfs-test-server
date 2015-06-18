@@ -246,7 +246,9 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool
 
 	header := make(map[string]string)
 	header["Accept"] = contentMediaType
-	header["Authorization"] = rv.Authorization
+	if !Config.IsPublic() {
+		header["Authorization"] = rv.Authorization
+	}
 	if download {
 		rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
