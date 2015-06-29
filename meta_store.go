@@ -213,6 +213,10 @@ func (s *MetaStore) Objects() ([]*MetaObject, error) {
 // authenticate uses the authorization string to determine whether
 // or not to proceed. This server assumes an HTTP Basic auth format.
 func (s *MetaStore) authenticate(authorization string) bool {
+	if Config.IsPublic() {
+		return true
+	}
+
 	if authorization == "" {
 		return false
 	}
