@@ -3,7 +3,7 @@ LFS Test Server
 
 [rel]: https://github.com/github/lfs-test-server/releases
 [lfs]: https://github.com/github/git-lfs
-[api]: https://github.com/github/git-lfs/blob/master/docs/api.md
+[api]: https://github.com/github/git-lfs/tree/master/docs/api#readme
 
 LFS Test Server is an example server that implements the [Git LFS API][api]. It
 is intended to be used for testing the [Git LFS][lfs] client and is not in a
