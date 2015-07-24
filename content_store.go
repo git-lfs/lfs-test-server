@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	errHashMismatch = errors.New("Content has does not match OID")
+	errHashMismatch = errors.New("Content hash does not match OID")
 	errSizeMismatch = errors.New("Content size does not match")
 )
 
