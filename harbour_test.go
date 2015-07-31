@@ -85,7 +85,7 @@ func TestGetMetaAuthed(t *testing.T) {
 		t.Fatalf("expected to see a size of `%d`, got: `%d`", contentSize, meta.Size)
 	}
 
-	download := meta.Links["download"]
+	download := meta.Actions["download"]
 	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+contentOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
@@ -140,11 +140,11 @@ func TestPostAuthedNewObject(t *testing.T) {
 		t.Fatalf("expected to see a size of `1234`, got: `%d`", meta.Size)
 	}
 
-	if download, ok := meta.Links["download"]; ok {
+	if download, ok := meta.Actions["download"]; ok {
 		t.Fatalf("expected POST to not contain a download link, got %s", download.Href)
 	}
 
-	upload, ok := meta.Links["upload"]
+	upload, ok := meta.Actions["upload"]
 	if !ok {
 		t.Fatal("expected upload link to be present")
 	}
@@ -186,12 +186,12 @@ func TestPostAuthedExistingObject(t *testing.T) {
 		t.Fatalf("expected to see a size of `%d`, got: `%d`", contentSize, meta.Size)
 	}
 
-	download := meta.Links["download"]
+	download := meta.Actions["download"]
 	if download.Href != "http://localhost:8080/bilbo/repo/objects/"+contentOid {
 		t.Fatalf("expected download link, got %s", download.Href)
 	}
 
-	upload, ok := meta.Links["upload"]
+	upload, ok := meta.Actions["upload"]
 	if !ok {
 		t.Fatalf("expected upload link to be present")
 	}
