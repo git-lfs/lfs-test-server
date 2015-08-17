@@ -117,11 +117,6 @@ func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Pragma", "public");
-	w.Header().Set("Expires", "0");
-	w.Header().Set("Cache-Control", "must-revalidate, post-check=0, pre-check=0");
-	w.Header().Add("Cache-Control", "private"); // required for certain browsers
-
 	w.Header().Set("Content-Type", "application/octet-stream");
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", vars["oid"]));
 	w.Header().Set("Content-Transfer-Encoding", "binary");
