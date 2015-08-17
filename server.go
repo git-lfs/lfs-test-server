@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
@@ -25,7 +26,8 @@ type RequestVars struct {
 }
 
 type BatchVars struct {
-	Objects []*RequestVars `json:"objects"`
+	Operation string         `json:"operation"`
+	Objects   []*RequestVars `json:"objects"`
 }
 
 // MetaObject is object metadata as seen by the object and metadata stores.
@@ -37,9 +39,15 @@ type MetaObject struct {
 
 // Representation is object medata as seen by clients of the lfs server.
 type Representation struct {
-	Oid   string           `json:"oid"`
-	Size  int64            `json:"size"`
-	Links map[string]*link `json:"_links"`
+	Oid     string           `json:"oid"`
+	Size    int64            `json:"size"`
+	Actions map[string]*link `json:"actions"`
+	Error   *ObjectError     `json:"error,omitempty"`
+}
+
+type ObjectError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 // ObjectLink builds a URL linking to the object.
@@ -55,8 +63,9 @@ func (v *RequestVars) ObjectLink() string {
 
 // link provides a structure used to build a hypermedia representation of an HTTP link.
 type link struct {
-	Href   string            `json:"href"`
-	Header map[string]string `json:"header,omitempty"`
+	Href      string            `json:"href"`
+	Header    map[string]string `json:"header,omitempty"`
+	ExpiresAt time.Time         `json:"expires_at,omitempty"`
 }
 
 // App links a Router, ContentStore, and MetaStore to provide the LFS server.
@@ -239,9 +248,9 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 // for json encoding
 func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool) *Representation {
 	rep := &Representation{
-		Oid:   meta.Oid,
-		Size:  meta.Size,
-		Links: make(map[string]*link),
+		Oid:     meta.Oid,
+		Size:    meta.Size,
+		Actions: make(map[string]*link),
 	}
 
 	header := make(map[string]string)
@@ -250,11 +259,11 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool
 		header["Authorization"] = rv.Authorization
 	}
 	if download {
-		rep.Links["download"] = &link{Href: rv.ObjectLink(), Header: header}
+		rep.Actions["download"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
 
 	if upload {
-		rep.Links["upload"] = &link{Href: rv.ObjectLink(), Header: header}
+		rep.Actions["upload"] = &link{Href: rv.ObjectLink(), Header: header}
 	}
 	return rep
 }
