@@ -101,7 +101,7 @@ func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
 		Authorization: r.Header.Get("Authorization"),
 	}
 
-	meta, err := a.metaStore.Get(rv)
+	meta, err := a.metaStore.UnsafeGet(rv)
 	if err != nil {
 		if isAuthError(err) {
 			requireAuth(w, r)
