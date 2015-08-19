@@ -51,6 +51,17 @@ func cssHandler(w http.ResponseWriter, r *http.Request) {
 	f.Close()
 }
 
+func checkBasicAuth(user string , pass string, ok bool) (bool) {
+	if !ok {
+		return false
+	}
+
+	if user != Config.AdminUser || pass != Config.AdminPass {
+		return false
+	}
+	return true
+}
+
 func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if Config.AdminUser == "" || Config.AdminPass == "" {
@@ -59,13 +70,9 @@ func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		user, pass, ok := r.BasicAuth()
-		if !ok {
-			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			writeStatus(w, r, 401)
-			return
-		}
 
-		if user != Config.AdminUser || pass != Config.AdminPass {
+		ret := checkBasicAuth(user, pass, ok);
+		if !ret {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
 			writeStatus(w, r, 401)
 			return

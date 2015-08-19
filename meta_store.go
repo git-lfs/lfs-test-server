@@ -243,6 +243,12 @@ func (s *MetaStore) authenticate(authorization string) bool {
 	}
 	user, password := cs[:i], cs[i+1:]
 
+	// check Basic Authentication (admin)
+	ok := checkBasicAuth(user, password, true)
+	if ok {
+		return true
+	}
+
 	value := ""
 
 	s.db.View(func(tx *bolt.Tx) error {
