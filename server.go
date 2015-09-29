@@ -89,6 +89,14 @@ func NewApp(content *ContentStore, meta *MetaStore) *App {
 
 	r.HandleFunc("/{user}/{repo}/objects", app.PostHandler).Methods("POST").MatcherFunc(MetaMatcher)
 
+	r.HandleFunc("/objects/batch", app.BatchHandler).Methods("POST").MatcherFunc(MetaMatcher)
+	route = "/objects/{oid}"
+	r.HandleFunc(route, app.GetContentHandler).Methods("GET", "HEAD").MatcherFunc(ContentMatcher)
+	r.HandleFunc(route, app.GetMetaHandler).Methods("GET", "HEAD").MatcherFunc(MetaMatcher)
+	r.HandleFunc(route, app.PutHandler).Methods("PUT").MatcherFunc(ContentMatcher)
+
+	r.HandleFunc("/objects", app.PostHandler).Methods("POST").MatcherFunc(MetaMatcher)
+
 	app.addMgmt(r)
 
 	app.router = r

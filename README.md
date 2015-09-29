@@ -59,7 +59,7 @@ To use the LFS test server with the Git LFS client, configure it in the reposito
 
 ```
   [lfs]
-    url = "http://localhost:8080/janedoe/lfsrepo"
+    url = "http://localhost:8080/"
 
 ```
 
@@ -69,7 +69,7 @@ NOTE: If using https with a self signed cert also disable cert checking in the c
 
 ```
 	[lfs]
-		url = "https://localhost:8080/jimdoe/lfsrepo"
+		url = "https://localhost:8080/"
 
 	[http]
 		sslverify = false
