@@ -210,7 +210,7 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 	// Create a response object
 	for _, object := range bv.Objects {
 		meta, err := a.metaStore.Get(object)
-		if err == nil { // Object is found
+		if err == nil && a.contentStore.Exists(meta) { // Object is found and exists
 			responseObjects = append(responseObjects, a.Represent(object, meta, true, false))
 			continue
 		}
@@ -254,6 +254,7 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.contentStore.Put(meta, r.Body); err != nil {
+		a.metaStore.Delete(rv)
 		w.WriteHeader(500)
 		fmt.Fprintf(w, `{"message":"%s"}`, err)
 		return

@@ -56,7 +56,7 @@ func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
 		return nil, newAuthError()
 	}
 	meta, error := s.UnsafeGet(v)
-	return meta, error;
+	return meta, error
 }
 
 // Get retrieves the Meta information for an object given information in
@@ -126,6 +126,29 @@ func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
 	}
 
 	return &meta, nil
+}
+
+// Delete removes the meta information from RequestVars to the store.
+func (s *MetaStore) Delete(v *RequestVars) error {
+	if !s.authenticate(v.Authorization) {
+		return newAuthError()
+	}
+
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(objectsBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		err := bucket.Delete([]byte(v.Oid))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 // Close closes the underlying boltdb.
