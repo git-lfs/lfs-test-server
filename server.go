@@ -52,7 +52,17 @@ type ObjectError struct {
 
 // ObjectLink builds a URL linking to the object.
 func (v *RequestVars) ObjectLink() string {
-	path := fmt.Sprintf("/%s/%s/objects/%s", v.User, v.Repo, v.Oid)
+	path := ""
+
+	if len(v.User) > 0 {
+		path += fmt.Sprintf("/%s", v.User)
+	}
+
+	if len(v.Repo) > 0 {
+		path += fmt.Sprintf("/%s", v.Repo)
+	}
+
+	path += fmt.Sprintf("/objects/%s", v.Oid)
 
 	if Config.IsHTTPS() {
 		return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
