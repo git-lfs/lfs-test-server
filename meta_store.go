@@ -55,7 +55,14 @@ func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
 	if !s.authenticate(v.Authorization) {
 		return nil, newAuthError()
 	}
+	meta, error := s.UnsafeGet(v)
+	return meta, error;
+}
 
+// Get retrieves the Meta information for an object given information in
+// RequestVars
+// DO NOT CHECK authentication, as it is supposed to have been done before
+func (s *MetaStore) UnsafeGet(v *RequestVars) (*MetaObject, error) {
 	var meta MetaObject
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -235,6 +242,12 @@ func (s *MetaStore) authenticate(authorization string) bool {
 		return false
 	}
 	user, password := cs[:i], cs[i+1:]
+
+	// check Basic Authentication (admin)
+	ok := checkBasicAuth(user, password, true)
+	if ok {
+		return true
+	}
 
 	value := ""
 
