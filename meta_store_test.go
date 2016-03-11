@@ -107,5 +107,6 @@ func setupMeta() {
 }
 
 func teardownMeta() {
+	metaStoreTest.Close()
 	os.RemoveAll("test-meta-store.db")
 }

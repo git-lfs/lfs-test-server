@@ -123,6 +123,7 @@ func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
 		writeStatus(w, r, 404)
 		return
 	}
+	defer content.Close()
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", vars["oid"]))

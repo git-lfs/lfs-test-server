@@ -10,7 +10,7 @@ import (
 
 var contentStore *ContentStore
 
-func TestContenStorePut(t *testing.T) {
+func TestContentStorePut(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -31,7 +31,7 @@ func TestContenStorePut(t *testing.T) {
 	}
 }
 
-func TestContenStorePutHashMismatch(t *testing.T) {
+func TestContentStorePutHashMismatch(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -52,7 +52,7 @@ func TestContenStorePutHashMismatch(t *testing.T) {
 	}
 }
 
-func TestContenStorePutSizeMismatch(t *testing.T) {
+func TestContentStorePutSizeMismatch(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -73,7 +73,7 @@ func TestContenStorePutSizeMismatch(t *testing.T) {
 	}
 }
 
-func TestContenStoreGet(t *testing.T) {
+func TestContentStoreGet(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -91,6 +91,8 @@ func TestContenStoreGet(t *testing.T) {
 	r, err := contentStore.Get(m, 0)
 	if err != nil {
 		t.Fatalf("expected get to succeed, got: %s", err)
+	} else {
+		defer r.Close()
 	}
 
 	by, _ := ioutil.ReadAll(r)
@@ -99,7 +101,7 @@ func TestContenStoreGet(t *testing.T) {
 	}
 }
 
-func TestContenStoreGetWithRange(t *testing.T) {
+func TestContentStoreGetWithRange(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -117,6 +119,8 @@ func TestContenStoreGetWithRange(t *testing.T) {
 	r, err := contentStore.Get(m, 5)
 	if err != nil {
 		t.Fatalf("expected get to succeed, got: %s", err)
+	} else {
+		defer r.Close()
 	}
 
 	by, _ := ioutil.ReadAll(r)
@@ -135,7 +139,7 @@ func TestContenStoreGetNonExisting(t *testing.T) {
 	}
 }
 
-func TestContenStoreExists(t *testing.T) {
+func TestContentStoreExists(t *testing.T) {
 	setup()
 	defer teardown()
 

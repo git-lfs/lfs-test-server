@@ -200,6 +200,7 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		writeStatus(w, r, 404)
 		return
 	}
+	defer content.Close()
 
 	w.WriteHeader(statusCode)
 	io.Copy(w, content)
