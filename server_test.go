@@ -39,6 +39,43 @@ func TestGetAuthed(t *testing.T) {
 	}
 }
 
+func TestGetAuthedWithRange(t *testing.T) {
+	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
+	if err != nil {
+		t.Fatalf("request error: %s", err)
+	}
+	req.SetBasicAuth(testUser, testPass)
+	req.Header.Set("Accept", contentMediaType)
+	fromByte := 5
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-", fromByte))
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("response error: %s", err)
+	}
+
+	if res.StatusCode != 206 {
+		t.Fatalf("expected status 206, got %d", res.StatusCode)
+	}
+	if cr := res.Header.Get("Content-Range"); len(cr) > 0 {
+		expected := fmt.Sprintf("bytes %d-%d/%d", fromByte, len(content)-1, len(content)-fromByte)
+		if cr != expected {
+			t.Fatalf("expected Content-Range header of %q, got %q", expected, cr)
+		}
+	} else {
+		t.Fatalf("missing Content-Range header in response")
+	}
+
+	by, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("expected response to contain content, got error: %s", err)
+	}
+
+	if string(by) != content[fromByte:] {
+		t.Fatalf("expected content to be `content`, got: %s", string(by))
+	}
+}
+
 func TestGetUnauthed(t *testing.T) {
 	req, err := http.NewRequest("GET", lfsServer.URL+"/user/repo/objects/"+contentOid, nil)
 	if err != nil {
@@ -240,7 +277,7 @@ func TestPut(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 
-	r, err := testContentStore.Get(&MetaObject{Oid: contentOid})
+	r, err := testContentStore.Get(&MetaObject{Oid: contentOid}, 0)
 	if err != nil {
 		t.Fatalf("error retreiving from content store: %s", err)
 	}

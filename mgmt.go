@@ -21,7 +21,7 @@ type pageData struct {
 	Config  *Configuration
 	Users   []*MetaUser
 	Objects []*MetaObject
-	Oid           string
+	Oid     string
 }
 
 func (a *App) addMgmt(r *mux.Router) {
@@ -51,7 +51,7 @@ func cssHandler(w http.ResponseWriter, r *http.Request) {
 	f.Close()
 }
 
-func checkBasicAuth(user string , pass string, ok bool) (bool) {
+func checkBasicAuth(user string, pass string, ok bool) bool {
 	if !ok {
 		return false
 	}
@@ -71,7 +71,7 @@ func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		user, pass, ok := r.BasicAuth()
 
-		ret := checkBasicAuth(user, pass, ok);
+		ret := checkBasicAuth(user, pass, ok)
 		if !ret {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
 			writeStatus(w, r, 401)
@@ -102,7 +102,7 @@ func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r);
+	vars := mux.Vars(r)
 	rv := &RequestVars{
 		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
@@ -118,16 +118,16 @@ func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := a.contentStore.Get(meta)
+	content, err := a.contentStore.Get(meta, 0)
 	if err != nil {
 		writeStatus(w, r, 404)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream");
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", vars["oid"]));
-	w.Header().Set("Content-Transfer-Encoding", "binary");
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size));
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", vars["oid"]))
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size))
 	io.Copy(w, content)
 }
 

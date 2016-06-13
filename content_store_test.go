@@ -88,7 +88,7 @@ func TestContenStoreGet(t *testing.T) {
 		t.Fatalf("expected put to succeed, got: %s", err)
 	}
 
-	r, err := contentStore.Get(m)
+	r, err := contentStore.Get(m, 0)
 	if err != nil {
 		t.Fatalf("expected get to succeed, got: %s", err)
 	}
@@ -99,11 +99,37 @@ func TestContenStoreGet(t *testing.T) {
 	}
 }
 
+func TestContenStoreGetWithRange(t *testing.T) {
+	setup()
+	defer teardown()
+
+	m := &MetaObject{
+		Oid:  "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72",
+		Size: 12,
+	}
+
+	b := bytes.NewBuffer([]byte("test content"))
+
+	if err := contentStore.Put(m, b); err != nil {
+		t.Fatalf("expected put to succeed, got: %s", err)
+	}
+
+	r, err := contentStore.Get(m, 5)
+	if err != nil {
+		t.Fatalf("expected get to succeed, got: %s", err)
+	}
+
+	by, _ := ioutil.ReadAll(r)
+	if string(by) != "content" {
+		t.Fatalf("expected to read content, got: %s", string(by))
+	}
+}
+
 func TestContenStoreGetNonExisting(t *testing.T) {
 	setup()
 	defer teardown()
 
-	_, err := contentStore.Get(&MetaObject{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+	_, err := contentStore.Get(&MetaObject{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, 0)
 	if err == nil {
 		t.Fatalf("expected to get an error, but content existed")
 	}
