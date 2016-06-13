@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ type RequestVars struct {
 }
 
 type BatchVars struct {
+	Transfers []string       `json:"transfers,omitempty"`
 	Operation string         `json:"operation"`
 	Objects   []*RequestVars `json:"objects"`
 }
@@ -35,6 +38,11 @@ type MetaObject struct {
 	Oid      string `json:"oid"`
 	Size     int64  `json:"size"`
 	Existing bool
+}
+
+type BatchResponse struct {
+	Transfer string            `json:"transfer,omitempty"`
+	Objects  []*Representation `json:"objects"`
 }
 
 // Representation is object medata as seen by clients of the lfs server.
@@ -142,14 +150,28 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := a.contentStore.Get(meta)
+	// Support resume download using Range header
+	var fromByte int64
+	statusCode := 200
+	if rangeHdr := r.Header.Get("Range"); rangeHdr != "" {
+		regex := regexp.MustCompile(`bytes=(\d+)\-.*`)
+		match := regex.FindStringSubmatch(rangeHdr)
+		if match != nil && len(match) > 1 {
+			statusCode = 206
+			fromByte, _ = strconv.ParseInt(match[1], 10, 32)
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", fromByte, meta.Size-1, int64(meta.Size)-fromByte))
+		}
+	}
+
+	content, err := a.contentStore.Get(meta, fromByte)
 	if err != nil {
 		writeStatus(w, r, 404)
 		return
 	}
 
+	w.WriteHeader(statusCode)
 	io.Copy(w, content)
-	logRequest(r, 200)
+	logRequest(r, statusCode)
 }
 
 // GetMetaHandler retrieves metadata about the object
@@ -229,11 +251,7 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", metaMediaType)
 
-	type ro struct {
-		Objects []*Representation `json:"objects"`
-	}
-
-	respobj := &ro{responseObjects}
+	respobj := &BatchResponse{Objects: responseObjects}
 
 	enc := json.NewEncoder(w)
 	enc.Encode(respobj)
