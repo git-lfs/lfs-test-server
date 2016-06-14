@@ -49,6 +49,8 @@ There are few things that can be configured via environment variables:
 	LFS_CERT        # Certificate file for tls
 	LFS_KEY         # tls key
 	LFS_SCHEME      # set to 'https' to override default http
+    LFS_USETUS      # set to 'true' to enable tusd (tus.io) resumable upload server; tusd must be on PATH, installed separately
+    LFS_TUSHOST     # The host used to start the tusd upload server, default "localhost:1080"
 
 If the `LFS_ADMINUSER` and `LFS_ADMINPASS` variables are set, a
 rudimentary admin interface can be accessed via

@@ -107,6 +107,12 @@ func main() {
 	logger.Log(kv{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen, "version": version})
 
 	app := NewApp(contentStore, metaStore)
+	if Config.IsUsingTus() {
+		tusServer.Start()
+	}
 	app.Serve(listener)
 	tl.WaitForChildren()
+	if Config.IsUsingTus() {
+		tusServer.Stop()
+	}
 }

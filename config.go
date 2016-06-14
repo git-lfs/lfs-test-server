@@ -21,6 +21,8 @@ type Configuration struct {
 	Key         string `config:""`
 	Scheme      string `config:"http"`
 	Public      string `config:"public"`
+	UseTus      string `config:"false"`
+	TusHost     string `config:"localhost:1080"`
 }
 
 func (c *Configuration) IsHTTPS() bool {
@@ -29,6 +31,14 @@ func (c *Configuration) IsHTTPS() bool {
 
 func (c *Configuration) IsPublic() bool {
 	switch Config.Public {
+	case "1", "true", "TRUE":
+		return true
+	}
+	return false
+}
+
+func (c *Configuration) IsUsingTus() bool {
+	switch Config.UseTus {
 	case "1", "true", "TRUE":
 		return true
 	}
