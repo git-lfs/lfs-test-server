@@ -58,8 +58,20 @@ type ObjectError struct {
 	Message string `json:"message"`
 }
 
-// ObjectLink builds a URL linking to the object.
-func (v *RequestVars) ObjectLink() string {
+// DownloadLink builds a URL to download the object.
+func (v *RequestVars) DownloadLink() string {
+	return v.internalLink("objects")
+}
+
+// UploadLink builds a URL to upload the object.
+func (v *RequestVars) UploadLink(useTus bool) string {
+	if useTus {
+		return v.tusLink()
+	}
+	return v.internalLink("objects")
+}
+
+func (v *RequestVars) internalLink(subpath string) string {
 	path := ""
 
 	if len(v.User) > 0 {
@@ -70,7 +82,25 @@ func (v *RequestVars) ObjectLink() string {
 		path += fmt.Sprintf("/%s", v.Repo)
 	}
 
-	path += fmt.Sprintf("/objects/%s", v.Oid)
+	path += fmt.Sprintf("/%s/%s", subpath, v.Oid)
+
+	if Config.IsHTTPS() {
+		return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
+	}
+
+	return fmt.Sprintf("http://%s%s", Config.Host, path)
+}
+
+func (v *RequestVars) tusLink() string {
+	link, err := tusServer.Create(v.Oid, v.Size)
+	if err != nil {
+		logger.Fatal(kv{"fn": fmt.Sprintf("Unable to create tus link for %s: %v", v.Oid, err)})
+	}
+	return link
+}
+
+func (v *RequestVars) VerifyLink() string {
+	path := fmt.Sprintf("/verify/%s", v.Oid)
 
 	if Config.IsHTTPS() {
 		return fmt.Sprintf("%s://%s%s", Config.Scheme, Config.Host, path)
@@ -114,6 +144,8 @@ func NewApp(content *ContentStore, meta *MetaStore) *App {
 	r.HandleFunc(route, app.PutHandler).Methods("PUT").MatcherFunc(ContentMatcher)
 
 	r.HandleFunc("/objects", app.PostHandler).Methods("POST").MatcherFunc(MetaMatcher)
+
+	r.HandleFunc("/verify/{oid}", app.VerifyHandler).Methods("POST")
 
 	app.addMgmt(r)
 
@@ -191,7 +223,7 @@ func (a *App) GetMetaHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		enc := json.NewEncoder(w)
-		enc.Encode(a.Represent(rv, meta, true, false))
+		enc.Encode(a.Represent(rv, meta, true, false, false))
 	}
 
 	logRequest(r, 200)
@@ -219,7 +251,7 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(sentStatus)
 
 	enc := json.NewEncoder(w)
-	enc.Encode(a.Represent(rv, meta, meta.Existing, true))
+	enc.Encode(a.Represent(rv, meta, meta.Existing, true, false))
 	logRequest(r, sentStatus)
 }
 
@@ -229,11 +261,21 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 
 	var responseObjects []*Representation
 
+	var useTus bool
+	if bv.Operation == "upload" && Config.IsUsingTus() {
+		for _, t := range bv.Transfers {
+			if t == "tus" {
+				useTus = true
+				break
+			}
+		}
+	}
+
 	// Create a response object
 	for _, object := range bv.Objects {
 		meta, err := a.metaStore.Get(object)
 		if err == nil && a.contentStore.Exists(meta) { // Object is found and exists
-			responseObjects = append(responseObjects, a.Represent(object, meta, true, false))
+			responseObjects = append(responseObjects, a.Represent(object, meta, true, false, false))
 			continue
 		}
 
@@ -245,13 +287,17 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 		// Object is not found
 		meta, err = a.metaStore.Put(object)
 		if err == nil {
-			responseObjects = append(responseObjects, a.Represent(object, meta, meta.Existing, true))
+			responseObjects = append(responseObjects, a.Represent(object, meta, meta.Existing, true, useTus))
 		}
 	}
 
 	w.Header().Set("Content-Type", metaMediaType)
 
 	respobj := &BatchResponse{Objects: responseObjects}
+	// Respond with TUS support if advertised
+	if useTus {
+		respobj.Transfer = "tus"
+	}
 
 	enc := json.NewEncoder(w)
 	enc.Encode(respobj)
@@ -281,9 +327,21 @@ func (a *App) PutHandler(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, 200)
 }
 
+func (a *App) VerifyHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	oid := vars["oid"]
+	err := tusServer.Finish(oid, a.contentStore)
+
+	if err != nil {
+		logger.Fatal(kv{"fn": "VerifyHandler", "err": fmt.Sprintf("Failed to verify %s: %v", oid, err)})
+	}
+
+	logRequest(r, 200)
+}
+
 // Represent takes a RequestVars and Meta and turns it into a Representation suitable
 // for json encoding
-func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool) *Representation {
+func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, useTus bool) *Representation {
 	rep := &Representation{
 		Oid:     meta.Oid,
 		Size:    meta.Size,
@@ -296,11 +354,14 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload bool
 		header["Authorization"] = rv.Authorization
 	}
 	if download {
-		rep.Actions["download"] = &link{Href: rv.ObjectLink(), Header: header}
+		rep.Actions["download"] = &link{Href: rv.DownloadLink(), Header: header}
 	}
 
 	if upload {
-		rep.Actions["upload"] = &link{Href: rv.ObjectLink(), Header: header}
+		rep.Actions["upload"] = &link{Href: rv.UploadLink(useTus), Header: header}
+		if useTus {
+			rep.Actions["verify"] = &link{Href: rv.VerifyLink(), Header: header}
+		}
 	}
 	return rep
 }
