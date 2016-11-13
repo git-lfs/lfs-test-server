@@ -26,7 +26,7 @@ func TestGetAuthed(t *testing.T) {
 	}
 
 	if res.StatusCode != 200 {
-		t.Fatalf("expected status 302, got %d", res.StatusCode)
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
 	}
 
 	by, err := ioutil.ReadAll(res.Body)
@@ -280,6 +280,8 @@ func TestPut(t *testing.T) {
 	r, err := testContentStore.Get(&MetaObject{Oid: contentOid}, 0)
 	if err != nil {
 		t.Fatalf("error retreiving from content store: %s", err)
+	} else {
+		defer r.Close()
 	}
 	c, err := ioutil.ReadAll(r)
 	if err != nil {
