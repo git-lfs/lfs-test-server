@@ -288,6 +288,7 @@ func TestPut(t *testing.T) {
 	if string(c) != content {
 		t.Fatalf("expected content, got `%s`", string(c))
 	}
+	r.Close()
 }
 
 func TestMediaTypesRequired(t *testing.T) {

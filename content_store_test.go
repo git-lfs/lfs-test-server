@@ -97,6 +97,8 @@ func TestContenStoreGet(t *testing.T) {
 	if string(by) != "test content" {
 		t.Fatalf("expected to read content, got: %s", string(by))
 	}
+
+	r.Close()
 }
 
 func TestContenStoreGetWithRange(t *testing.T) {
@@ -123,16 +125,20 @@ func TestContenStoreGetWithRange(t *testing.T) {
 	if string(by) != "content" {
 		t.Fatalf("expected to read content, got: %s", string(by))
 	}
+
+	r.Close()
 }
 
 func TestContenStoreGetNonExisting(t *testing.T) {
 	setup()
 	defer teardown()
 
-	_, err := contentStore.Get(&MetaObject{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, 0)
+	f, err := contentStore.Get(&MetaObject{Oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, 0)
 	if err == nil {
 		t.Fatalf("expected to get an error, but content existed")
 	}
+
+	f.Close()
 }
 
 func TestContenStoreExists(t *testing.T) {
