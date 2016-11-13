@@ -129,6 +129,7 @@ func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size))
 	io.Copy(w, content)
+	content.Close()
 }
 
 func (a *App) usersHandler(w http.ResponseWriter, r *http.Request) {
