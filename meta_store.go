@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
-	"strings"
+	"fmt"
+	"math"
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -20,11 +23,13 @@ type MetaStore struct {
 var (
 	errNoBucket       = errors.New("Bucket not found")
 	errObjectNotFound = errors.New("Object not found")
+	errNotOwner       = errors.New("Attempt to delete other user's lock")
 )
 
 var (
 	usersBucket   = []byte("users")
 	objectsBucket = []byte("objects")
+	locksBucket   = []byte("locks")
 )
 
 // NewMetaStore creates a new MetaStore using the boltdb database at dbFile.
@@ -43,6 +48,10 @@ func NewMetaStore(dbFile string) (*MetaStore, error) {
 			return err
 		}
 
+		if _, err := tx.CreateBucketIfNotExists(locksBucket); err != nil {
+			return err
+		}
+
 		return nil
 	})
 
@@ -52,9 +61,6 @@ func NewMetaStore(dbFile string) (*MetaStore, error) {
 // Get retrieves the Meta information for an object given information in
 // RequestVars
 func (s *MetaStore) Get(v *RequestVars) (*MetaObject, error) {
-	if !s.authenticate(v.Authorization) {
-		return nil, newAuthError()
-	}
 	meta, error := s.UnsafeGet(v)
 	return meta, error
 }
@@ -89,10 +95,6 @@ func (s *MetaStore) UnsafeGet(v *RequestVars) (*MetaObject, error) {
 
 // Put writes meta information from RequestVars to the store.
 func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
-	if !s.authenticate(v.Authorization) {
-		return nil, newAuthError()
-	}
-
 	// Check if it exists first
 	if meta, err := s.Get(v); err == nil {
 		meta.Existing = true
@@ -130,10 +132,6 @@ func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
 
 // Delete removes the meta information from RequestVars to the store.
 func (s *MetaStore) Delete(v *RequestVars) error {
-	if !s.authenticate(v.Authorization) {
-		return newAuthError()
-	}
-
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(objectsBucket)
 		if bucket == nil {
@@ -150,6 +148,160 @@ func (s *MetaStore) Delete(v *RequestVars) error {
 
 	return err
 }
+
+// AddLocks write locks to the store for the repo.
+func (s *MetaStore) AddLocks(repo string, l ...Lock) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(locksBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		var locks []Lock
+		data := bucket.Get([]byte(repo))
+		if data != nil {
+			if err := json.Unmarshal(data, &locks); err != nil {
+				return err
+			}
+		}
+		locks = append(locks, l...)
+		sort.Sort(LocksByCreatedAt(locks))
+		data, err := json.Marshal(&locks)
+		if err != nil {
+			return err
+		}
+
+		return bucket.Put([]byte(repo), data)
+	})
+	return err
+}
+
+// Locks retrieves locks for the repo from the store
+func (s *MetaStore) Locks(repo string) ([]Lock, error) {
+	var locks []Lock
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(locksBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		data := bucket.Get([]byte(repo))
+		if data != nil {
+			if err := json.Unmarshal(data, &locks); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return locks, err
+}
+
+// FilteredLocks return filtered locks for the repo
+func (s *MetaStore) FilteredLocks(repo, path, cursor, limit string) (locks []Lock, next string, err error) {
+	locks, err = s.Locks(repo)
+	if err != nil {
+		return
+	}
+
+	if cursor != "" {
+		lastSeen := -1
+		for i, l := range locks {
+			if l.Id == cursor {
+				lastSeen = i
+				break
+			}
+		}
+
+		if lastSeen > -1 {
+			locks = locks[lastSeen:]
+		} else {
+			err = fmt.Errorf("cursor (%s) not found", cursor)
+			return
+		}
+	}
+
+	if path != "" {
+		var filtered []Lock
+		for _, l := range locks {
+			if l.Path == path {
+				filtered = append(filtered, l)
+			}
+		}
+
+		locks = filtered
+	}
+
+	if limit != "" {
+		var size int
+		size, err = strconv.Atoi(limit)
+		if err != nil || size < 0 {
+			locks = make([]Lock, 0)
+			err = fmt.Errorf("Invalid limit amount: %s", limit)
+			return
+		}
+
+		size = int(math.Min(float64(size), float64(len(locks))))
+		if size+1 < len(locks) {
+			next = locks[size].Id
+		}
+		locks = locks[:size]
+	}
+
+	return locks, next, nil
+}
+
+// DeleteLock removes lock for the repo by id from the store
+func (s *MetaStore) DeleteLock(repo, user, id string, force bool) (*Lock, error) {
+	var deleted *Lock
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(locksBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		var locks []Lock
+		data := bucket.Get([]byte(repo))
+		if data != nil {
+			if err := json.Unmarshal(data, &locks); err != nil {
+				return err
+			}
+		}
+		newLocks := make([]Lock, 0, len(locks))
+
+		var lock Lock
+		for _, l := range locks {
+			if l.Id == id {
+				if l.Owner.Name != user && !force {
+					return errNotOwner
+				}
+				lock = l
+			} else if len(l.Id) > 0 {
+				newLocks = append(newLocks, l)
+			}
+		}
+		if lock.Id == "" {
+			return nil
+		}
+		deleted = &lock
+
+		if len(newLocks) == 0 {
+			return bucket.Delete([]byte(repo))
+		}
+
+		data, err := json.Marshal(&newLocks)
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte(repo), data)
+	})
+	return deleted, err
+}
+
+type LocksByCreatedAt []Lock
+
+func (c LocksByCreatedAt) Len() int           { return len(c) }
+func (c LocksByCreatedAt) Less(i, j int) bool { return c[i].LockedAt.Before(c[j].LockedAt) }
+func (c LocksByCreatedAt) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 
 // Close closes the underlying boltdb.
 func (s *MetaStore) Close() {
@@ -240,36 +392,39 @@ func (s *MetaStore) Objects() ([]*MetaObject, error) {
 	return objects, err
 }
 
-// authenticate uses the authorization string to determine whether
-// or not to proceed. This server assumes an HTTP Basic auth format.
-func (s *MetaStore) authenticate(authorization string) bool {
-	if Config.IsPublic() {
-		return true
-	}
+// AllLocks return all locks in the store, lock path is prepended with repo
+func (s *MetaStore) AllLocks() ([]Lock, error) {
+	var locks []Lock
+	err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(locksBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
 
-	if authorization == "" {
-		return false
-	}
+		bucket.ForEach(func(k, v []byte) error {
+			var l []Lock
+			if err := json.Unmarshal(v, &l); err != nil {
+				return err
+			}
+			for _, lv := range l {
+				lv.Path = fmt.Sprintf("%s:%s", k, lv.Path)
+				locks = append(locks, lv)
+			}
+			return nil
+		})
 
-	if !strings.HasPrefix(authorization, "Basic ") {
-		return false
-	}
+		return nil
+	})
+	return locks, err
+}
 
-	c, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authorization, "Basic "))
-	if err != nil {
-		return false
-	}
-	cs := string(c)
-	i := strings.IndexByte(cs, ':')
-	if i < 0 {
-		return false
-	}
-	user, password := cs[:i], cs[i+1:]
-
-	// check Basic Authentication (admin)
-	ok := checkBasicAuth(user, password, true)
-	if ok {
-		return true
+// Authenticate authorizes user with password and returns the user name
+func (s *MetaStore) Authenticate(user, password string) (string, bool) {
+	// check admin
+	if len(user) > 0 && len(password) > 0 {
+		if ok := checkBasicAuth(user, password, true); ok {
+			return user, true
+		}
 	}
 
 	value := ""
@@ -284,20 +439,5 @@ func (s *MetaStore) authenticate(authorization string) bool {
 		return nil
 	})
 
-	if value != "" && value == password {
-		return true
-	}
-	return false
-}
-
-type authError struct {
-	error
-}
-
-func (e authError) AuthError() bool {
-	return true
-}
-
-func newAuthError() error {
-	return authError{errors.New("Forbidden")}
+	return user, value != "" && value == password
 }
