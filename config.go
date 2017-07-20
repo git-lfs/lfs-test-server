@@ -20,10 +20,29 @@ type Configuration struct {
 	Cert        string `config:""`
 	Key         string `config:""`
 	Scheme      string `config:"http"`
+	Public      string `config:"public"`
+	UseTus      string `config:"false"`
+	TusHost     string `config:"localhost:1080"`
 }
 
 func (c *Configuration) IsHTTPS() bool {
 	return strings.Contains(Config.Scheme, "https")
+}
+
+func (c *Configuration) IsPublic() bool {
+	switch Config.Public {
+	case "1", "true", "TRUE":
+		return true
+	}
+	return false
+}
+
+func (c *Configuration) IsUsingTus() bool {
+	switch Config.UseTus {
+	case "1", "true", "TRUE":
+		return true
+	}
+	return false
 }
 
 // Config is the global app configuration

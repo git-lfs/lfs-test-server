@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -21,11 +20,15 @@ type pageData struct {
 	Config  *Configuration
 	Users   []*MetaUser
 	Objects []*MetaObject
+	Locks   []Lock
+	Oid     string
 }
 
 func (a *App) addMgmt(r *mux.Router) {
 	r.HandleFunc("/mgmt", basicAuth(a.indexHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/objects", basicAuth(a.objectsHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/raw/{oid}", basicAuth(a.objectsRawHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/locks", basicAuth(a.locksHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/users", basicAuth(a.usersHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/add", basicAuth(a.addUserHandler)).Methods("POST")
 	r.HandleFunc("/mgmt/del", basicAuth(a.delUserHandler)).Methods("POST")
@@ -49,6 +52,17 @@ func cssHandler(w http.ResponseWriter, r *http.Request) {
 	f.Close()
 }
 
+func checkBasicAuth(user string, pass string, ok bool) bool {
+	if !ok {
+		return false
+	}
+
+	if user != Config.AdminUser || pass != Config.AdminPass {
+		return false
+	}
+	return true
+}
+
 func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if Config.AdminUser == "" || Config.AdminPass == "" {
@@ -57,13 +71,9 @@ func basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		user, pass, ok := r.BasicAuth()
-		if !ok {
-			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
-			writeStatus(w, r, 401)
-			return
-		}
 
-		if user != Config.AdminUser || pass != Config.AdminPass {
+		ret := checkBasicAuth(user, pass, ok)
+		if !ret {
 			w.Header().Set("WWW-Authenticate", "Basic realm=mgmt")
 			writeStatus(w, r, 401)
 			return
@@ -92,6 +102,42 @@ func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *App) objectsRawHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	rv := &RequestVars{Oid: vars["oid"]}
+
+	meta, err := a.metaStore.UnsafeGet(rv)
+	if err != nil {
+		writeStatus(w, r, 404)
+		return
+	}
+
+	content, err := a.contentStore.Get(meta, 0)
+	if err != nil {
+		writeStatus(w, r, 404)
+		return
+	}
+	defer content.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s;", vars["oid"]))
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size))
+	io.Copy(w, content)
+}
+
+func (a *App) locksHandler(w http.ResponseWriter, r *http.Request) {
+	locks, err := a.metaStore.AllLocks()
+	if err != nil {
+		fmt.Fprintf(w, "Error retrieving locks: %s", err)
+		return
+	}
+
+	if err := render(w, "locks.tmpl", pageData{Name: "locks", Locks: locks}); err != nil {
+		writeStatus(w, r, 404)
+	}
+}
+
 func (a *App) usersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := a.metaStore.Users()
 	if err != nil {
@@ -108,7 +154,7 @@ func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
 	user := r.FormValue("name")
 	pass := r.FormValue("password")
 	if user == "" || pass == "" {
-		fmt.Fprintf(w, "Invalid username or password")
+		fmt.Fprint(w, "Invalid username or password")
 		return
 	}
 
@@ -123,7 +169,7 @@ func (a *App) addUserHandler(w http.ResponseWriter, r *http.Request) {
 func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
 	user := r.FormValue("name")
 	if user == "" {
-		fmt.Fprintf(w, "Invalid username")
+		fmt.Fprint(w, "Invalid username")
 		return
 	}
 
@@ -150,22 +196,4 @@ func render(w http.ResponseWriter, tmpl string, data pageData) error {
 	t.New("content").Parse(contentString)
 
 	return t.Execute(w, data)
-}
-
-func authenticate(r *http.Request) error {
-	err := errors.New("Forbidden")
-
-	if Config.AdminUser == "" || Config.AdminPass == "" {
-		return err
-	}
-
-	user, pass, ok := r.BasicAuth()
-	if !ok {
-		return err
-	}
-
-	if user == Config.AdminUser && pass == Config.AdminPass {
-		return nil
-	}
-	return err
 }

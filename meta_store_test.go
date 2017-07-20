@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 var (
 	metaStoreTest *MetaStore
 )
 
-func TestGetWithAuth(t *testing.T) {
+func TestGetMeta(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	meta, err := metaStoreTest.Get(&RequestVars{Authorization: testAuth, Oid: contentOid})
+	meta, err := metaStoreTest.Get(&RequestVars{Oid: contentOid})
 	if err != nil {
 		t.Fatalf("Error retreiving meta: %s", err)
 	}
@@ -28,21 +29,11 @@ func TestGetWithAuth(t *testing.T) {
 	}
 }
 
-func TestGetWithoutAuth(t *testing.T) {
+func TestPutMeta(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	_, err := metaStoreTest.Get(&RequestVars{Authorization: badAuth, Oid: contentOid})
-	if !isAuthError(err) {
-		t.Errorf("expected auth error, got: %s", err)
-	}
-}
-
-func TestPutWithAuth(t *testing.T) {
-	setupMeta()
-	defer teardownMeta()
-
-	meta, err := metaStoreTest.Put(&RequestVars{Authorization: testAuth, Oid: nonexistingOid, Size: 42})
+	meta, err := metaStoreTest.Put(&RequestVars{Oid: nonExistingOid, Size: 42})
 	if err != nil {
 		t.Errorf("expected put to succeed, got : %s", err)
 	}
@@ -51,12 +42,12 @@ func TestPutWithAuth(t *testing.T) {
 		t.Errorf("expected meta to not have existed")
 	}
 
-	meta, err = metaStoreTest.Get(&RequestVars{Authorization: testAuth, Oid: nonexistingOid})
+	meta, err = metaStoreTest.Get(&RequestVars{Oid: nonExistingOid})
 	if err != nil {
 		t.Errorf("expected to be able to retreive new put, got : %s", err)
 	}
 
-	if meta.Oid != nonexistingOid {
+	if meta.Oid != nonExistingOid {
 		t.Errorf("expected oids to match, got: %s", meta.Oid)
 	}
 
@@ -64,7 +55,7 @@ func TestPutWithAuth(t *testing.T) {
 		t.Errorf("expected sizes to match, got: %d", meta.Size)
 	}
 
-	meta, err = metaStoreTest.Put(&RequestVars{Authorization: testAuth, Oid: nonexistingOid, Size: 42})
+	meta, err = metaStoreTest.Put(&RequestVars{Oid: nonExistingOid, Size: 42})
 	if err != nil {
 		t.Errorf("expected put to succeed, got : %s", err)
 	}
@@ -74,13 +65,164 @@ func TestPutWithAuth(t *testing.T) {
 	}
 }
 
-func TestPuthWithoutAuth(t *testing.T) {
+func TestLocks(t *testing.T) {
 	setupMeta()
 	defer teardownMeta()
 
-	_, err := metaStoreTest.Put(&RequestVars{Authorization: badAuth, Oid: contentOid, Size: 42})
-	if !isAuthError(err) {
-		t.Errorf("expected auth error, got: %s", err)
+	for i := 0; i < 5; i++ {
+		lock := NewTestLock(randomLockId(), fmt.Sprintf("path-%d", i), fmt.Sprintf("user-%d", i))
+		if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+			t.Errorf("expected AddLocks to succeed, got : %s", err)
+		}
+	}
+
+	locks, err := metaStoreTest.Locks(testRepo)
+	if err != nil {
+		t.Errorf("expected Locks to succeed, got : %s", err)
+	}
+	if len(locks) != 5 {
+		t.Errorf("expected returned lock count to match, got: %d", len(locks))
+	}
+}
+
+func TestFilteredLocks(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	testLocks := make([]Lock, 0, 5)
+	for i := 0; i < 5; i++ {
+		lock := NewTestLock(randomLockId(), fmt.Sprintf("path-%d", i), fmt.Sprintf("user-%d", i))
+		testLocks = append(testLocks, lock)
+	}
+	if err := metaStoreTest.AddLocks(testRepo, testLocks...); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	locks, next, err := metaStoreTest.FilteredLocks(testRepo, "", "", "3")
+	if err != nil {
+		t.Errorf("expected FilteredLocks to succeed, got : %s", err)
+	}
+	if len(locks) != 3 {
+		t.Errorf("expected locks count to match limit, got: %d", len(locks))
+	}
+	if next == "" {
+		t.Errorf("expected next to exist")
+	}
+
+	locks, next, err = metaStoreTest.FilteredLocks(testRepo, "", next, "2")
+	if err != nil {
+		t.Errorf("expected FilteredLocks to succeed, got : %s", err)
+	}
+	if len(locks) != 2 {
+		t.Errorf("expected locks count to match limit, got: %d", len(locks))
+	}
+	if next != "" {
+		t.Errorf("expected next to not exist, got: %s", next)
+	}
+}
+
+func TestAddLocks(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	lock := NewTestLock(lockId, lockPath, testUser)
+	if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	locks, _, err := metaStoreTest.FilteredLocks(testRepo, lock.Path, "", "1")
+	if err != nil {
+		t.Errorf("expected FilteredLocks to succeed, got : %s", err)
+	}
+	if len(locks) != 1 {
+		t.Errorf("expected lock to be existed")
+	}
+	if locks[0].Id != lockId {
+		t.Errorf("expected lockId to match, got: %s", locks[0])
+	}
+}
+
+func TestDeleteLock(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	lock := NewTestLock(lockId, lockPath, testUser)
+	if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	deleted, err := metaStoreTest.DeleteLock(testRepo, testUser, lock.Id, false)
+	if err != nil {
+		t.Errorf("expected DeleteLock to succeed, got : %s", err)
+	}
+	if deleted == nil || deleted.Id != lock.Id {
+		t.Errorf("expected deleted lock to be returned, got : %s", deleted)
+	}
+}
+
+func TestDeleteLockNotOwner(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	lock := NewTestLock(lockId, lockPath, testUser)
+	if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	deleted, err := metaStoreTest.DeleteLock(testRepo, testUser1, lock.Id, false)
+	if err == nil || deleted != nil {
+		t.Errorf("expected DeleteLock to failed")
+	}
+
+	if err != errNotOwner {
+		t.Errorf("expected DeleteLock error match, got: %s", err)
+	}
+}
+
+func TestDeleteLockNotOwnerForce(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	lock := NewTestLock(lockId, lockPath, testUser)
+	if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	deleted, err := metaStoreTest.DeleteLock(testRepo, testUser1, lock.Id, true)
+	if err != nil {
+		t.Errorf("expected DeleteLock(force) to succeed, got : %s", err)
+	}
+	if deleted == nil || deleted.Id != lock.Id {
+		t.Errorf("expected deleted lock to be returned, got : %s", deleted)
+	}
+}
+
+func TestDeleteLockNonExisting(t *testing.T) {
+	setupMeta()
+	defer teardownMeta()
+
+	lock := NewTestLock(lockId, lockPath, testUser)
+	if err := metaStoreTest.AddLocks(testRepo, lock); err != nil {
+		t.Errorf("expected AddLocks to succeed, got : %s", err)
+	}
+
+	deleted, err := metaStoreTest.DeleteLock(testRepo, testUser, nonExistingLockId, false)
+	if err != nil {
+		t.Errorf("expected DeleteLock to succeed, got : %s", err)
+	}
+	if deleted != nil {
+		t.Errorf("expected nil returned, got : %s", deleted)
+	}
+}
+
+func NewTestLock(id, path, user string) Lock {
+	return Lock{
+		Id:   id,
+		Path: path,
+		Owner: User{
+			Name: user,
+		},
+		LockedAt: time.Now(),
 	}
 }
 
@@ -98,7 +240,7 @@ func setupMeta() {
 		os.Exit(1)
 	}
 
-	rv := &RequestVars{Authorization: testAuth, Oid: contentOid, Size: contentSize}
+	rv := &RequestVars{Oid: contentOid, Size: contentSize}
 	if _, err := metaStoreTest.Put(rv); err != nil {
 		teardownMeta()
 		fmt.Printf("error seeding test meta store: %s\n", err)
@@ -107,5 +249,6 @@ func setupMeta() {
 }
 
 func teardownMeta() {
+	metaStoreTest.Close()
 	os.RemoveAll("test-meta-store.db")
 }

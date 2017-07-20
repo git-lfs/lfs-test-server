@@ -6,7 +6,7 @@
     </tr>
     {{range .Objects}}
       <tr>
-        <td>{{.Oid}}</td>
+        <td><a target="_blank" href="/mgmt/raw/{{.Oid}}">{{.Oid}}</a></td>
         <td>{{.Size}}</td>
       </tr>
     {{end}}

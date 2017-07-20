@@ -3,7 +3,7 @@ LFS Test Server
 
 [rel]: https://github.com/github/lfs-test-server/releases
 [lfs]: https://github.com/github/git-lfs
-[api]: https://github.com/github/git-lfs/blob/master/docs/api.md
+[api]: https://github.com/github/git-lfs/tree/master/docs/api#readme
 
 LFS Test Server is an example server that implements the [Git LFS API][api]. It
 is intended to be used for testing the [Git LFS][lfs] client and is not in a
@@ -49,6 +49,8 @@ There are few things that can be configured via environment variables:
 	LFS_CERT        # Certificate file for tls
 	LFS_KEY         # tls key
 	LFS_SCHEME      # set to 'https' to override default http
+    LFS_USETUS      # set to 'true' to enable tusd (tus.io) resumable upload server; tusd must be on PATH, installed separately
+    LFS_TUSHOST     # The host used to start the tusd upload server, default "localhost:1080"
 
 If the `LFS_ADMINUSER` and `LFS_ADMINPASS` variables are set, a
 rudimentary admin interface can be accessed via
@@ -59,7 +61,7 @@ To use the LFS test server with the Git LFS client, configure it in the reposito
 
 ```
   [lfs]
-    url = "http://localhost:8080/janedoe/lfsrepo"
+    url = "http://localhost:8080/"
 
 ```
 
@@ -69,7 +71,7 @@ NOTE: If using https with a self signed cert also disable cert checking in the c
 
 ```
 	[lfs]
-		url = "https://localhost:8080/jimdoe/lfsrepo"
+		url = "https://localhost:8080/"
 
 	[http]
 		sslverify = false
