@@ -414,11 +414,17 @@ func (a *App) LocksVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		enc.Encode(&VerifiableLockList{Message: err.Error()})
 		return
 	}
+	
+	// Limit is optional
+	limit := reqBody.Limit
+	if limit == 0 {
+		limit = 100
+	}
 
 	ll := &VerifiableLockList{}
 	locks, nextCursor, err := a.metaStore.FilteredLocks(repo, "",
 		reqBody.Cursor,
-		strconv.Itoa(reqBody.Limit))
+		strconv.Itoa(limit))
 	if err != nil {
 		ll.Message = err.Error()
 	} else {
