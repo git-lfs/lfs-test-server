@@ -24,6 +24,7 @@ type RequestVars struct {
 	User     string
 	Password string
 	Repo     string
+	Authorization string
 }
 
 type BatchVars struct {
@@ -551,6 +552,11 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, use
 
 	header := make(map[string]string)
 	header["Accept"] = contentMediaType
+	
+	if len(rv.Authorization) > 0 {
+		header["Authorization"] = rv.Authorization
+	}
+	
 	if download {
 		rep.Actions["download"] = &link{Href: rv.DownloadLink(), Header: header}
 	}
@@ -608,6 +614,7 @@ func unpack(r *http.Request) *RequestVars {
 		User: vars["user"],
 		Repo: vars["repo"],
 		Oid:  vars["oid"],
+		Authorization: r.Header.Get("Authorization"),
 	}
 
 	if r.Method == "POST" { // Maybe also check if +json
@@ -640,6 +647,7 @@ func unpackBatch(r *http.Request) *BatchVars {
 	for i := 0; i < len(bv.Objects); i++ {
 		bv.Objects[i].User = vars["user"]
 		bv.Objects[i].Repo = vars["repo"]
+		bv.Objects[i].Authorization = r.Header.Get("Authorization")
 	}
 
 	return &bv
