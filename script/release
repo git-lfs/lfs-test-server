@@ -99,7 +99,7 @@ echo "$payload" > $tmpl
 
 ${EDITOR:-vim} $tmpl
 
-curl -n -X POST -d @$tmpl -o $out https://api.github.com/repos/github/lfs-test-server/releases
+curl -n -X POST -d @$tmpl -o $out https://api.github.com/repos/git-lfs/lfs-test-server/releases
 id=$(cat $out | jq -r ".id")
 
 if [[ $id == "null" ]]; then echo "Failed creating release."; cat $out; exit 1; fi
