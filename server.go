@@ -551,10 +551,13 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, use
 	}
 
 	header := make(map[string]string)
+	verifyHeader := make(map[string]string)
+
 	header["Accept"] = contentMediaType
 
 	if len(rv.Authorization) > 0 {
 		header["Authorization"] = rv.Authorization
+		verifyHeader["Authorization"] = rv.Authorization
 	}
 
 	if download {
@@ -564,7 +567,7 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, use
 	if upload {
 		rep.Actions["upload"] = &link{Href: rv.UploadLink(useTus), Header: header}
 		if useTus {
-			rep.Actions["verify"] = &link{Href: rv.VerifyLink(), Header: header}
+			rep.Actions["verify"] = &link{Href: rv.VerifyLink(), Header: verifyHeader}
 		}
 	}
 	return rep
