@@ -19,11 +19,11 @@ import (
 // RequestVars contain variables from the HTTP request. Variables from routing, json body decoding, and
 // some headers are stored.
 type RequestVars struct {
-	Oid      string
-	Size     int64
-	User     string
-	Password string
-	Repo     string
+	Oid           string
+	Size          int64
+	User          string
+	Password      string
+	Repo          string
 	Authorization string
 }
 
@@ -415,7 +415,7 @@ func (a *App) LocksVerifyHandler(w http.ResponseWriter, r *http.Request) {
 		enc.Encode(&VerifiableLockList{Message: err.Error()})
 		return
 	}
-	
+
 	// Limit is optional
 	limit := reqBody.Limit
 	if limit == 0 {
@@ -551,12 +551,15 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, use
 	}
 
 	header := make(map[string]string)
+	verifyHeader := make(map[string]string)
+
 	header["Accept"] = contentMediaType
-	
+
 	if len(rv.Authorization) > 0 {
 		header["Authorization"] = rv.Authorization
+		verifyHeader["Authorization"] = rv.Authorization
 	}
-	
+
 	if download {
 		rep.Actions["download"] = &link{Href: rv.DownloadLink(), Header: header}
 	}
@@ -564,7 +567,7 @@ func (a *App) Represent(rv *RequestVars, meta *MetaObject, download, upload, use
 	if upload {
 		rep.Actions["upload"] = &link{Href: rv.UploadLink(useTus), Header: header}
 		if useTus {
-			rep.Actions["verify"] = &link{Href: rv.VerifyLink(), Header: header}
+			rep.Actions["verify"] = &link{Href: rv.VerifyLink(), Header: verifyHeader}
 		}
 	}
 	return rep
@@ -611,9 +614,9 @@ func randomLockId() string {
 func unpack(r *http.Request) *RequestVars {
 	vars := mux.Vars(r)
 	rv := &RequestVars{
-		User: vars["user"],
-		Repo: vars["repo"],
-		Oid:  vars["oid"],
+		User:          vars["user"],
+		Repo:          vars["repo"],
+		Oid:           vars["oid"],
 		Authorization: r.Header.Get("Authorization"),
 	}
 
