@@ -44,8 +44,8 @@ There are few things that can be configured via environment variables:
     LFS_HOST        # The host used when the server generates URLs, default: "localhost:8080"
     LFS_METADB      # The database file the server uses to store meta information, default: "lfs.db"
     LFS_CONTENTPATH # The path where LFS files are store, default: "lfs-content"
-    LFS_ADMINUSER   # An administrator username, default: unset
-    LFS_ADMINPASS   # An administrator password, default: unset
+    LFS_ADMINUSER   # An administrator username, default: not set
+    LFS_ADMINPASS   # An administrator password, default: not set
     LFS_CERT        # Certificate file for tls
     LFS_KEY         # tls key
     LFS_SCHEME      # set to 'https' to override default http
@@ -54,7 +54,10 @@ There are few things that can be configured via environment variables:
 
 If the `LFS_ADMINUSER` and `LFS_ADMINPASS` variables are set, a
 rudimentary admin interface can be accessed via
-`http://$LFS_HOST/mgmt`. Here you can add and remove users.
+`http://$LFS_HOST/mgmt`. Here you can add and remove users, which must
+be done before you can use the server with the client.  If either of
+these variables are not set (which is the default), the administrative
+interface is disabled.
 
 To use the LFS test server with the Git LFS client, configure it in the repository's `.gitconfig` file:
 
