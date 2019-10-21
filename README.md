@@ -40,15 +40,15 @@ To build from source, use the Go tools:
 Running the binary will start an LFS server on `localhost:8080` by default.
 There are few things that can be configured via environment variables:
 
-	LFS_LISTEN      # The address:port the server listens on, default: "tcp://:8080"
-	LFS_HOST        # The host used when the server generates URLs, default: "localhost:8080"
-	LFS_METADB      # The database file the server uses to store meta information, default: "lfs.db"
-	LFS_CONTENTPATH # The path where LFS files are store, default: "lfs-content"
-	LFS_ADMINUSER   # An administrator username, default: unset
-	LFS_ADMINPASS   # An administrator password, default: unset
-	LFS_CERT        # Certificate file for tls
-	LFS_KEY         # tls key
-	LFS_SCHEME      # set to 'https' to override default http
+    LFS_LISTEN      # The address:port the server listens on, default: "tcp://:8080"
+    LFS_HOST        # The host used when the server generates URLs, default: "localhost:8080"
+    LFS_METADB      # The database file the server uses to store meta information, default: "lfs.db"
+    LFS_CONTENTPATH # The path where LFS files are store, default: "lfs-content"
+    LFS_ADMINUSER   # An administrator username, default: unset
+    LFS_ADMINPASS   # An administrator password, default: unset
+    LFS_CERT        # Certificate file for tls
+    LFS_KEY         # tls key
+    LFS_SCHEME      # set to 'https' to override default http
     LFS_USETUS      # set to 'true' to enable tusd (tus.io) resumable upload server; tusd must be on PATH, installed separately
     LFS_TUSHOST     # The host used to start the tusd upload server, default "localhost:1080"
 
@@ -70,11 +70,11 @@ HTTPS:
 NOTE: If using https with a self signed cert also disable cert checking in the client repo.
 
 ```
-	[lfs]
-		url = "https://localhost:8080/"
+  [lfs]
+    url = "https://localhost:8080/"
 
-	[http]
-		sslverify = false
+  [http]
+    sslverify = false
 
 ```
 
