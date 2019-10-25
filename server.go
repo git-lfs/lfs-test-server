@@ -240,7 +240,7 @@ func (a *App) GetContentHandler(w http.ResponseWriter, r *http.Request) {
 		match := regex.FindStringSubmatch(rangeHdr)
 		if match != nil && len(match) > 1 {
 			statusCode = 206
-			fromByte, _ = strconv.ParseInt(match[1], 10, 32)
+			fromByte, _ = strconv.ParseInt(match[1], 10, 64)
 			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", fromByte, meta.Size-1, int64(meta.Size)-fromByte))
 		}
 	}
