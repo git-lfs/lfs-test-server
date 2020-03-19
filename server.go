@@ -323,9 +323,21 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Object is not found
-		meta, err = a.metaStore.Put(object)
-		if err == nil {
-			responseObjects = append(responseObjects, a.Represent(object, meta, meta.Existing, true, useTus))
+		if bv.Operation == "upload" {
+			meta, err = a.metaStore.Put(object)
+			if err == nil {
+				responseObjects = append(responseObjects, a.Represent(object, meta, false, true, useTus))
+			}
+		} else {
+			rep := &Representation{
+				Oid:  object.Oid,
+				Size: object.Size,
+				Error: &ObjectError{
+					Code:    404,
+					Message: "Not found",
+				},
+			}
+			responseObjects = append(responseObjects, rep)
 		}
 	}
 
