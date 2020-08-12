@@ -17,9 +17,7 @@ sending patches.
 
 ## Installing
 
-Download the [latest version][rel]. It is a single binary file.
-
-Alternatively, use the Go installer:
+Use the Go installer:
 
 ```
   $ go install github.com/github/lfs-test-server
