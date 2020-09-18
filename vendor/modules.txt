@@ -1,0 +1,13 @@
+# github.com/GeertJohan/go.rice v0.0.0-20150223153050-b4a18af23143
+github.com/GeertJohan/go.rice
+github.com/GeertJohan/go.rice/embedded
+# github.com/boltdb/bolt v0.0.0-20150329202000-ee954308d641
+github.com/boltdb/bolt
+# github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
+github.com/daaku/go.zipexe
+# github.com/gorilla/context v0.0.0-20141217160251-215affda49ad
+github.com/gorilla/context
+# github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e
+github.com/gorilla/mux
+# github.com/kardianos/osext v0.0.0-20150317202929-efacde031546
+github.com/kardianos/osext
