@@ -45,7 +45,7 @@ func (t *TusServer) Start() {
 		port = hostparts[1]
 	}
 	t.tusProcess = exec.Command("tusd",
-		"-dir", t.dataPath,
+		"-upload-dir", t.dataPath,
 		"-host", host,
 		"-port", port)
 	// Make sure tus server is started before continuing
