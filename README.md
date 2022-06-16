@@ -114,7 +114,7 @@ export LFS_LISTEN LFS_HOST LFS_CONTENTPATH LFS_ADMINUSER LFS_ADMINPASS LFS_CERT 
 
 Build the server
 
-```
+``
 go build
 
 ```
