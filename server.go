@@ -302,6 +302,10 @@ func (a *App) PostHandler(w http.ResponseWriter, r *http.Request) {
 func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 	bv := unpackBatch(r)
 
+	if bv.Operation != "upload" && bv.Operation != "download" && bv.Operation != "list" {
+		panic(fmt.Sprintf("Invalid batch operation: %v", bv.Operation))
+	}
+
 	var responseObjects []*Representation
 
 	var useTus bool
@@ -314,30 +318,45 @@ func (a *App) BatchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create a response object
-	for _, object := range bv.Objects {
-		meta, err := a.metaStore.Get(object)
-		if err == nil && a.contentStore.Exists(meta) { // Object is found and exists
-			responseObjects = append(responseObjects, a.Represent(object, meta, true, false, false))
-			continue
+	if bv.Operation == "list" {
+		objects, err := a.metaStore.Objects()
+		if err != nil {
+			panic(fmt.Sprintf("could not list all objects from meta store: %v", err))
 		}
+		for _, object := range objects {
+			responseObjects = append(responseObjects, &Representation{
+				Oid:     object.Oid,
+				Size:    object.Size,
+				Actions: make(map[string]*link),
+				Error:   nil,
+			})
+		}
+	} else {
+		// Create a response object
+		for _, object := range bv.Objects {
+			meta, err := a.metaStore.Get(object)
+			if err == nil && a.contentStore.Exists(meta) { // Object is found and exists
+				responseObjects = append(responseObjects, a.Represent(object, meta, true, false, false))
+				continue
+			}
 
-		// Object is not found
-		if bv.Operation == "upload" {
-			meta, err = a.metaStore.Put(object)
-			if err == nil {
-				responseObjects = append(responseObjects, a.Represent(object, meta, false, true, useTus))
+			// Object is not found
+			if bv.Operation == "upload" {
+				meta, err = a.metaStore.Put(object)
+				if err == nil {
+					responseObjects = append(responseObjects, a.Represent(object, meta, false, true, useTus))
+				}
+			} else {
+				rep := &Representation{
+					Oid:  object.Oid,
+					Size: object.Size,
+					Error: &ObjectError{
+						Code:    404,
+						Message: "Not found",
+					},
+				}
+				responseObjects = append(responseObjects, rep)
 			}
-		} else {
-			rep := &Representation{
-				Oid:  object.Oid,
-				Size: object.Size,
-				Error: &ObjectError{
-					Code:    404,
-					Message: "Not found",
-				},
-			}
-			responseObjects = append(responseObjects, rep)
 		}
 	}
 
