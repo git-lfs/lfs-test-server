@@ -57,7 +57,7 @@ be done before you can use the server with the client.  If either of
 these variables are not set (which is the default), the administrative
 interface is disabled.
 
-To use the LFS test server with the Git LFS client, configure it in the repository's `.gitconfig` file:
+To use the LFS test server with the Git LFS client, configure it in the repository's `.lfsconfig`:
 
 
 ```
