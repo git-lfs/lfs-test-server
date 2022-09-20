@@ -9,4 +9,4 @@ require (
 	github.com/kardianos/osext v0.0.0-20150317202929-efacde031546 // indirect
 )
 
-go 1.11
+go 1.16
