@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"embed"
 	"fmt"
 	"net"
 	"os"
@@ -19,6 +20,9 @@ const (
 var (
 	logger = NewKVLogger(os.Stdout)
 )
+
+//go:embed all:mgmt
+var embedded embed.FS
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
 // connections. It's used by ListenAndServe and ListenAndServeTLS so

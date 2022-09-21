@@ -25,19 +25,6 @@ would like to make that are not dependent upon each other, consider submitting
 them as separate pull requests.
 - Write a [good commit message](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 
-## Updating management templates
-0. Install go.rice with `go install github.com/GeertJohan/go.rice`
-0. Run `rice embed-go` after all template changes have been made
-0. Commit the change
-0. Submit a pull request.
-
-## Updating 3rd party packages
-
-0. Run `godep save` to add new dependencies.
-0. Run `godep update foo/bar` to update the package `foo/bar`.
-0. Commit the change.  lfs-test-server vendors the full source code in the repository.
-0. Submit a pull request.
-
 ## Resources
 
 - [Contributing to Open Source on GitHub](https://guides.github.com/activities/contributing-to-open-source/)

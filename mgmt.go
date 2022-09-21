@@ -6,13 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
-)
-
-var (
-	cssBox      *rice.Box
-	templateBox *rice.Box
 )
 
 type pageData struct {
@@ -33,14 +27,12 @@ func (a *App) addMgmt(r *mux.Router) {
 	r.HandleFunc("/mgmt/add", basicAuth(a.addUserHandler)).Methods("POST")
 	r.HandleFunc("/mgmt/del", basicAuth(a.delUserHandler)).Methods("POST")
 
-	cssBox = rice.MustFindBox("mgmt/css")
-	templateBox = rice.MustFindBox("mgmt/templates")
 	r.HandleFunc("/mgmt/css/{file}", basicAuth(cssHandler))
 }
 
 func cssHandler(w http.ResponseWriter, r *http.Request) {
 	file := mux.Vars(r)["file"]
-	f, err := cssBox.Open(file)
+	f, err := embedded.Open(fmt.Sprintf("mgmt/css/%s", file))
 	if err != nil {
 		writeStatus(w, r, 404)
 		return
@@ -182,15 +174,17 @@ func (a *App) delUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func render(w http.ResponseWriter, tmpl string, data pageData) error {
-	bodyString, err := templateBox.String("body.tmpl")
+	body, err := embedded.ReadFile("mgmt/templates/body.tmpl")
 	if err != nil {
 		return err
 	}
+	bodyString := string(body)
 
-	contentString, err := templateBox.String(tmpl)
+	content, err := embedded.ReadFile(fmt.Sprintf("mgmt/templates/%s", tmpl))
 	if err != nil {
 		return err
 	}
+	contentString := string(content)
 
 	t := template.Must(template.New("main").Parse(bodyString))
 	t.New("content").Parse(contentString)
