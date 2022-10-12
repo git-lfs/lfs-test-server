@@ -77,12 +77,6 @@ func init() {
 	}
 
 	if Config.ExtOrigin == "" {
-		// why not ignore the IsHTTPS check and use the following statement directly:
-		// `Config.ExtOrigin = fmt.Sprintf("%s://%s", Config.Scheme, Config.Host)`
-		if Config.IsHTTPS() {
-			Config.ExtOrigin = fmt.Sprintf("%s://%s", Config.Scheme, Config.Host)
-		} else {
-			Config.ExtOrigin = fmt.Sprintf("http://%s", Config.Host)
-		}
+		Config.ExtOrigin = fmt.Sprintf("%s://%s", Config.Scheme, Config.Host)
 	}
 }
