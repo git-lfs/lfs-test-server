@@ -13,6 +13,7 @@ import (
 type Configuration struct {
 	Listen      string `config:"tcp://:8080"`
 	Host        string `config:"localhost:8080"`
+	ExtOrigin   string `config:""` // consider lfs-test-server may behind a reverse proxy
 	MetaDB      string `config:"lfs.db"`
 	ContentPath string `config:"lfs-content"`
 	AdminUser   string `config:""`
@@ -73,5 +74,9 @@ func init() {
 	if port := os.Getenv("PORT"); port != "" {
 		// If $PORT is set, override LFS_LISTEN. This is useful for deploying to Heroku.
 		Config.Listen = "tcp://:" + port
+	}
+
+	if Config.ExtOrigin == "" {
+		Config.ExtOrigin = fmt.Sprintf("%s://%s", Config.Scheme, Config.Host)
 	}
 }

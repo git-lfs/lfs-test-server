@@ -1,14 +1,14 @@
 <div class="container">
-  <p><strong>URL:</strong> {{.Config.Scheme}}://{{.Config.Host}}</p>
+  <p><strong>URL:</strong> {{.Config.ExtOrigin}}</p>
   <p><strong>Listen Address:</strong> {{.Config.Listen}}</p>
   <p><strong>Database:</strong> {{.Config.MetaDB}}</p>
   <p><strong>Content:</strong> {{.Config.ContentPath}}</p>
 </div>
 <div class="container">
-  <p>To configure a repository to use this LFS server, add the following to the repository's <code>.gitconfig</code> file:</p>
+  <p>To configure a repository to use this LFS server, add the following to the repository's Git config or <code>.lfsconfig</code> file:</p>
   <pre>
 <code>[lfs]
-    url = "{{.Config.Scheme}}://{{.Config.Host}}/"
+    url = "{{.Config.ExtOrigin}}"
 </code>
 </pre>
 
