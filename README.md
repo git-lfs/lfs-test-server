@@ -20,7 +20,7 @@ sending patches.
 Use the Go installer:
 
 ```
-  $ go install github.com/github/lfs-test-server
+  $ go install github.com/git-lfs/lfs-test-server
 ```
 
 
@@ -29,7 +29,7 @@ Use the Go installer:
 To build from source, use the Go tools:
 
 ```
-  $ go get github.com/github/lfs-test-server
+  $ go get github.com/git-lfs/lfs-test-server
 ```
 
 
