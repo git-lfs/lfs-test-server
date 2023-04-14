@@ -6,4 +6,4 @@ require (
 	github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e
 )
 
-go 1.16
+go 1.20
