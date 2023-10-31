@@ -63,9 +63,28 @@ func wrapHttps(l net.Listener, cert, key string) (net.Listener, error) {
 	return tlsListener, nil
 }
 
+func maincmd() {
+	// cmdline interface: cmd oid -> returns object from db or error
+	metaStore, err := NewMetaStore(Config.MetaDB)
+	if err != nil {
+		logger.Fatal(kv{"fn": "maincmd", "err": "Could not open the meta store: " + err.Error()})
+	}
+
+	oid := os.Args[2]
+	meta, err := metaStore.UnsafeGet(&RequestVars{Oid: oid})
+	if err != nil {
+		logger.Fatal(kv{"fn": "maincmd", "err": "Could not find object: " + err.Error()})
+	}
+	fmt.Printf("%+v\n", meta)
+}
+
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "-v" {
 		fmt.Println(version)
+		os.Exit(0)
+	}
+	if len(os.Args) > 2 && os.Args[1] == "cmd" {
+		maincmd()
 		os.Exit(0)
 	}
 
