@@ -1,9 +1,10 @@
 module github.com/git-lfs/lfs-test-server
 
 require (
-	github.com/boltdb/bolt v0.0.0-20150329202000-ee954308d641
-	github.com/gorilla/context v0.0.0-20141217160251-215affda49ad
-	github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e
+	github.com/boltdb/bolt v1.3.1
+	github.com/gorilla/context v1.1.2
+	github.com/gorilla/mux v1.8.1
+	golang.org/x/sys v0.15.0 // indirect
 )
 
 go 1.16
