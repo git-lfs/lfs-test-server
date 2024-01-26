@@ -1,4 +1,4 @@
-LFS Test Server
+.LFS Test Server
 ======
 
 [rel]: https://github.com/github/lfs-test-server/releases
