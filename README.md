@@ -131,3 +131,21 @@ Check the managment page
 browser: https://localhost:9999/mgmt
 
 
+## Debugging
+
+`lfs-test-server` supports a basic cmd to lookup `OID's` via the cmdline to help in debugging, eg. investigating client problems with a particular `OID` and it's properties.
+In this mode `lfs-test-server` expects the same configuration as when running in daemon mode, but will just executing the requested cmd and then exit.
+
+This is especially helpful in server environments where it's not always possible to get to the web interface easily or where it's just too slow because of DB size.
+
+`lfs-test-server cmd <OID>`
+
+Outputs the full OID record
+
+# Example
+
+```
+% . /etc/default/lfs-instancefoo    # to source server config
+% ./lfs-test-server cmd 7c9414fe21ad7b45ffb6e72da86f9a9e13dbb2971365ae7bcb8cc7fbbba7419c
+&{Oid:7c9414fe21ad7b45ffb6e72da86f9a9e13dbb2971365ae7bcb8cc7fbbba7419c Size:3334144 Existing:false}
+```
