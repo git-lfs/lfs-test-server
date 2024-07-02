@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+
+  "crypto/sha1"
+  "encoding/hex"
 )
 
 // MetaStore implements a metadata storage. It stores user credentials and Meta information
@@ -316,7 +319,10 @@ func (s *MetaStore) AddUser(user, pass string) error {
 			return errNoBucket
 		}
 
-		err := bucket.Put([]byte(user), []byte(pass))
+		pass_sha1b := sha1.Sum([]byte(pass))
+		pass_sha1 := hex.EncodeToString(pass_sha1b[:])
+
+		err := bucket.Put([]byte(user), []byte(pass_sha1))
 		if err != nil {
 			return err
 		}
@@ -439,5 +445,8 @@ func (s *MetaStore) Authenticate(user, password string) (string, bool) {
 		return nil
 	})
 
-	return user, value != "" && value == password
+	pass_sha1b := sha1.Sum([]byte(password))
+	pass_sha1 := hex.EncodeToString(pass_sha1b[:])
+
+	return user, value != "" && value == pass_sha1
 }
