@@ -1,5 +1,5 @@
-FROM golang:1.14.7
-MAINTAINER GitHub, Inc.
+FROM golang:1.20
+LABEL org.opencontainers.image.authors=" GitHub, Inc."
 
 WORKDIR /go/src/github.com/git-lfs/lfs-test-server
 
